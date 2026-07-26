@@ -1,0 +1,166 @@
+<!doctype html>
+<html lang="az">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>POS - Məhsul siyahısı</title>
+    <style>
+      body { font-family: Arial, sans-serif; margin: 40px; }
+      table { border-collapse: collapse; width: 100%; margin-bottom: 24px; }
+      th, td { border: 1px solid #ccc; padding: 10px; text-align: left; }
+      th { background: #f5f5f5; }
+      .cart-box { border: 1px solid #ddd; padding: 16px; background: #fafafa; }
+      .cart-box h2 { margin-top: 0; }
+      .qty-input { width: 70px; padding: 6px; }
+      .btn { padding: 6px 10px; cursor: pointer; }
+      .remove-btn { background: #e74c3c; color: white; border: none; }
+      .total { font-weight: bold; font-size: 18px; margin-top: 10px; }
+    </style>
+  </head>
+  <body>
+    <h1>POS - Məhsul siyahısı</h1>
+    <table>
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>Ad</th>
+          <th>Qiymət</th>
+          <th>Stok</th>
+          <th>Miqdar</th>
+          <th>Əməliyyat</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for product in products %}
+        <tr>
+          <td>{{ product.id }}</td>
+          <td>{{ product.name }}</td>
+          <td>{{ "%.2f" | format(product.price) }}</td>
+          <td>{{ product.stock }}</td>
+          <td>
+            <input type="number" min="1" value="1" class="qty-input" id="qty-{{ product.id }}">
+          </td>
+          <td>
+            <button
+              class="btn"
+              type="button"
+              data-id="{{ product.id }}"
+              data-name="{{ product.name }}"
+              data-price="{{ product.price }}"
+              onclick="addToCart(this)"
+            >
+              Səbətə əlavə et
+            </button>
+          </td>
+        </tr>
+        {% else %}
+        <tr>
+          <td colspan="6">Hal-hazırda məhsul yoxdur.</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+
+    <div class="cart-box">
+      <h2>Səbət</h2>
+      <div id="cart-items">Səbət hələ boşdur.</div>
+      <div class="total" id="cart-total">Ümumi məbləğ: 0.00 AZN</div>
+      <br>
+      <button class="btn" type="button" onclick="checkout()">Satışı təsdiqlə</button>
+      <div id="checkout-message" style="margin-top: 10px;"></div>
+    </div>
+
+    <script>
+      const cart = [];
+
+      function addToCart(button) {
+        const id = Number(button.dataset.id);
+        const name = button.dataset.name;
+        const price = Number(button.dataset.price);
+        const qtyInput = document.getElementById('qty-' + id);
+        const quantity = Number(qtyInput.value || 1);
+
+        if (quantity < 1) {
+          alert('Miqdar 1-dən az ola bilməz.');
+          return;
+        }
+
+        const existing = cart.find(item => item.id === id);
+        if (existing) {
+          existing.quantity += quantity;
+        } else {
+          cart.push({ id, name, price, quantity });
+        }
+
+        renderCart();
+      }
+
+      function removeFromCart(index) {
+        cart.splice(index, 1);
+        renderCart();
+      }
+
+      function renderCart() {
+        const cartItems = document.getElementById('cart-items');
+        const cartTotal = document.getElementById('cart-total');
+
+        if (cart.length === 0) {
+          cartItems.innerHTML = 'Səbət hələ boşdur.';
+          cartTotal.textContent = 'Ümumi məbləğ: 0.00 AZN';
+          return;
+        }
+
+        let html = '<table><thead><tr><th>Ad</th><th>Miqdar</th><th>Vahid qiymət</th><th>Cəmi</th><th></th></tr></thead><tbody>';
+        let total = 0;
+
+        cart.forEach((item, index) => {
+          const lineTotal = item.price * item.quantity;
+          total += lineTotal;
+          html += `
+            <tr>
+              <td>${item.name}</td>
+              <td>${item.quantity}</td>
+              <td>${item.price.toFixed(2)} AZN</td>
+              <td>${lineTotal.toFixed(2)} AZN</td>
+              <td><button class="btn remove-btn" type="button" onclick="removeFromCart(${index})">Sil</button></td>
+            </tr>
+          `;
+        });
+
+        html += '</tbody></table>';
+        cartItems.innerHTML = html;
+        cartTotal.textContent = `Ümumi məbləğ: ${total.toFixed(2)} AZN`;
+      }
+
+      async function checkout() {
+        if (cart.length === 0) {
+          alert('Səbət boşdur.');
+          return;
+        }
+
+        const messageBox = document.getElementById('checkout-message');
+        messageBox.textContent = 'Satış yazılır...';
+
+        try {
+          const response = await fetch('/checkout', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ cart })
+          });
+
+          const result = await response.json();
+          if (!response.ok) {
+            throw new Error(result.message || 'Satış uğursuz oldu.');
+          }
+
+          messageBox.textContent = result.message;
+          cart.length = 0;
+          renderCart();
+          window.location.reload();
+        } catch (error) {
+          messageBox.textContent = error.message;
+        }
+      }
+    </script>
+  </body>
+</html>
