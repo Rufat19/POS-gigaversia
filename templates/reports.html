@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="az">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Hesabatlar</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+    <!-- Chart.js CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+      .reports-top { display:flex; gap:12px; align-items:center; margin-bottom:12px }
+      .report-cards { display:flex; gap:12px; margin-bottom:18px }
+      .report-card { background:#fff;padding:12px;border-radius:8px;box-shadow:0 1px 4px rgba(0,0,0,0.03);min-width:240px }
+    </style>
+  </head>
+  <body>
+    <header style="display:flex;align-items:center;gap:12px;padding:12px;background:#fff;box-shadow:0 1px 4px rgba(0,0,0,0.03)">
+      <a href="/">POS</a>
+      <h2>Hesabatlar</h2>
+      <div style="margin-left:auto"><a href="/operations">Əməliyyatlar</a> | <a href="/">Məhsullar</a></div>
+    </header>
+
+    <div style="max-width:1100px;margin:18px auto;padding:12px">
+      <div class="reports-top">
+        <label>Başlanğıc tarix: <input type="date" id="start-date" value="{{ default_start }}"></label>
+        <label>Son tarix: <input type="date" id="end-date" value="{{ default_end }}"></label>
+        <button id="filter-btn" class="btn">Filtrlə</button>
+      </div>
+
+      <div class="report-cards">
+        <div class="report-card">
+          <h4>Ən çox satılan məhsul</h4>
+          <div id="most-sold">-</div>
+        </div>
+        <div class="report-card">
+          <h4>Ən az satılan məhsul</h4>
+          <div id="least-sold">-</div>
+        </div>
+      </div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+        <div style="background:#fff;padding:12px;border-radius:8px;box-shadow:0 1px 4px rgba(0,0,0,0.03)">
+          <h4>Kateqoriya üzrə satış payı</h4>
+          <canvas id="pieChart"></canvas>
+        </div>
+        <div style="background:#fff;padding:12px;border-radius:8px;box-shadow:0 1px 4px rgba(0,0,0,0.03)">
+          <h4>Gün üzrə ümumi satış (AZN)</h4>
+          <canvas id="barDaily"></canvas>
+        </div>
+      </div>
+
+      <div style="margin-top:16px;background:#fff;padding:12px;border-radius:8px;box-shadow:0 1px 4px rgba(0,0,0,0.03)">
+        <h4>Top 5 ən çox satılan məhsul (ədəd)</h4>
+        <canvas id="barTop5"></canvas>
+      </div>
+    </div>
+
+    <script>
+      let pieChart, barDaily, barTop5;
+
+      async function fetchReports(start, end){
+        const res = await fetch('/api/reports',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({start_date:start,end_date:end})});
+        return res.json();
+      }
+
+      function renderMostLeast(data){
+        const most = data.most_sold; const least = data.least_sold;
+        document.getElementById('most-sold').textContent = most ? `${most.name} — ${most.total_qty} əd.` : 'Məlumat yoxdur';
+        document.getElementById('least-sold').textContent = least ? `${least.name} — ${least.total_qty} əd.` : 'Məlumat yoxdur';
+      }
+
+      function renderPie(data){
+        const ctx = document.getElementById('pieChart').getContext('2d');
+        const labels = data.category_breakdown.map(r=>r.category);
+        const vals = data.category_breakdown.map(r=>r.total_amount);
+        if(pieChart) pieChart.destroy();
+        pieChart = new Chart(ctx, { type:'pie', data:{labels, datasets:[{data:vals, backgroundColor:[ '#ff7b2d','#36a2eb','#4bc0c0','#9966ff','#ff6384' ] }] }, options:{responsive:true} });
+      }
+
+      function renderDaily(data){
+        const ctx = document.getElementById('barDaily').getContext('2d');
+        const labels = data.daily_totals.map(r=>r.date);
+        const vals = data.daily_totals.map(r=>r.total);
+        if(barDaily) barDaily.destroy();
+        barDaily = new Chart(ctx, { type:'bar', data:{labels, datasets:[{label:'AZN', data:vals, backgroundColor:'#36a2eb'}]}, options:{responsive:true, scales:{x:{ticks:{maxRotation:45,minRotation:0}}}} });
+      }
+
+      function renderTop5(data){
+        const ctx = document.getElementById('barTop5').getContext('2d');
+        const labels = data.top5_products.map(r=>r.name);
+        const vals = data.top5_products.map(r=>r.total_qty);
+        if(barTop5) barTop5.destroy();
+        barTop5 = new Chart(ctx, { type:'bar', data:{labels, datasets:[{label:'əd.', data:vals, backgroundColor:'#ff7b2d'}]}, options:{responsive:true, indexAxis:'y'} });
+      }
+
+      async function loadAndRender(){
+        const start = document.getElementById('start-date').value;
+        const end = document.getElementById('end-date').value;
+        const res = await fetchReports(start,end);
+        if(!res.success){ alert(res.message||'Xəta'); return; }
+        renderMostLeast(res);
+        renderPie(res);
+        renderDaily(res);
+        renderTop5(res);
+      }
+
+      document.getElementById('filter-btn').addEventListener('click', ()=>{ loadAndRender(); });
+
+      // initial load
+      document.addEventListener('DOMContentLoaded', ()=>{ loadAndRender(); });
+    </script>
+  </body>
+</html>

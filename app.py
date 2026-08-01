@@ -392,6 +392,188 @@ def operations_page():
     return render_template('operations.html', products=products, history=history)
 
 
+@app.route('/reports')
+def reports_page():
+    """Render the reports page with default last-30-days values."""
+    from datetime import datetime, timedelta
+    end = datetime.utcnow().date()
+    start = end - timedelta(days=29)
+    # format YYYY-MM-DD
+    return render_template('reports.html', default_start=start.isoformat(), default_end=end.isoformat())
+
+
+@app.route('/api/reports', methods=['POST'])
+def api_reports():
+    """Return JSON report data for given date range (start_date, end_date).
+
+    Expects JSON: {start_date: 'YYYY-MM-DD', end_date: 'YYYY-MM-DD'}
+    """
+    data = request.get_json(silent=True) or {}
+    start_date = data.get('start_date')
+    end_date = data.get('end_date')
+    if not start_date or not end_date:
+        return jsonify({'success': False, 'message': 'start_date and end_date required'}), 400
+
+    conn = get_db()
+    database_url, _ = get_db_config()
+
+    try:
+        if database_url:
+            cur = conn.cursor()
+            try:
+                # Product totals by quantity
+                cur.execute(
+                    """
+                    SELECT p.id, p.name, SUM(si.quantity) AS total_qty
+                    FROM sale_items si
+                    JOIN sales s ON si.sale_id = s.id
+                    JOIN products p ON si.product_id = p.id
+                    WHERE s.created_at::date BETWEEN %s AND %s
+                    GROUP BY p.id, p.name
+                    ORDER BY total_qty DESC
+                    """,
+                    (start_date, end_date),
+                )
+                prod_totals = cur.fetchall()
+
+                # most / least
+                most = prod_totals[0] if prod_totals else None
+                least = prod_totals[-1] if prod_totals else None
+
+                # category breakdown (amount)
+                cur.execute(
+                    """
+                    SELECT p.category, SUM(si.quantity * si.unit_price) AS total_amount
+                    FROM sale_items si
+                    JOIN sales s ON si.sale_id = s.id
+                    JOIN products p ON si.product_id = p.id
+                    WHERE s.created_at::date BETWEEN %s AND %s
+                    GROUP BY p.category
+                    ORDER BY total_amount DESC
+                    """,
+                    (start_date, end_date),
+                )
+                cat_break = cur.fetchall()
+
+                # daily totals
+                cur.execute(
+                    """
+                    SELECT DATE_TRUNC('day', s.created_at) AS day, SUM(si.quantity * si.unit_price) AS total
+                    FROM sale_items si
+                    JOIN sales s ON si.sale_id = s.id
+                    WHERE s.created_at::date BETWEEN %s AND %s
+                    GROUP BY day
+                    ORDER BY day ASC
+                    """,
+                    (start_date, end_date),
+                )
+                daily = cur.fetchall()
+
+                # top5 products by qty
+                cur.execute(
+                    """
+                    SELECT p.name, SUM(si.quantity) AS total_qty
+                    FROM sale_items si
+                    JOIN sales s ON si.sale_id = s.id
+                    JOIN products p ON si.product_id = p.id
+                    WHERE s.created_at::date BETWEEN %s AND %s
+                    GROUP BY p.name
+                    ORDER BY total_qty DESC
+                    LIMIT 5
+                    """,
+                    (start_date, end_date),
+                )
+                top5 = cur.fetchall()
+
+            finally:
+                cur.close()
+
+            # convert rows (RealDictCursor returns mapping)
+            prod_totals_list = [{'id': r['id'], 'name': r['name'], 'total_qty': int(r['total_qty'])} for r in prod_totals]
+            most_obj = {'id': most['id'], 'name': most['name'], 'total_qty': int(most['total_qty'])} if most else None
+            least_obj = {'id': least['id'], 'name': least['name'], 'total_qty': int(least['total_qty'])} if least else None
+            cat_list = [{'category': r['category'] or 'Other', 'total_amount': float(r['total_amount']) if r['total_amount'] is not None else 0.0} for r in cat_break]
+            daily_list = [{'date': r['day'].strftime('%Y-%m-%d'), 'total': float(r['total']) if r['total'] is not None else 0.0} for r in daily]
+            top5_list = [{'name': r['name'], 'total_qty': int(r['total_qty'])} for r in top5]
+
+        else:
+            # SQLite paramstyle and date handling
+            cur = conn.cursor()
+            try:
+                cur.execute(
+                    """
+                    SELECT p.id, p.name, SUM(si.quantity) AS total_qty
+                    FROM sale_items si
+                    JOIN sales s ON si.sale_id = s.id
+                    JOIN products p ON si.product_id = p.id
+                    WHERE DATE(s.created_at) BETWEEN ? AND ?
+                    GROUP BY p.id, p.name
+                    ORDER BY total_qty DESC
+                    """,
+                    (start_date, end_date),
+                )
+                prod_totals = cur.fetchall()
+
+                most = prod_totals[0] if prod_totals else None
+                least = prod_totals[-1] if prod_totals else None
+
+                cur.execute(
+                    """
+                    SELECT p.category, SUM(si.quantity * si.unit_price) AS total_amount
+                    FROM sale_items si
+                    JOIN sales s ON si.sale_id = s.id
+                    JOIN products p ON si.product_id = p.id
+                    WHERE DATE(s.created_at) BETWEEN ? AND ?
+                    GROUP BY p.category
+                    ORDER BY total_amount DESC
+                    """,
+                    (start_date, end_date),
+                )
+                cat_break = cur.fetchall()
+
+                cur.execute(
+                    """
+                    SELECT DATE(s.created_at) AS day, SUM(si.quantity * si.unit_price) AS total
+                    FROM sale_items si
+                    JOIN sales s ON si.sale_id = s.id
+                    WHERE DATE(s.created_at) BETWEEN ? AND ?
+                    GROUP BY day
+                    ORDER BY day ASC
+                    """,
+                    (start_date, end_date),
+                )
+                daily = cur.fetchall()
+
+                cur.execute(
+                    """
+                    SELECT p.name, SUM(si.quantity) AS total_qty
+                    FROM sale_items si
+                    JOIN sales s ON si.sale_id = s.id
+                    JOIN products p ON si.product_id = p.id
+                    WHERE DATE(s.created_at) BETWEEN ? AND ?
+                    GROUP BY p.name
+                    ORDER BY total_qty DESC
+                    LIMIT 5
+                    """,
+                    (start_date, end_date),
+                )
+                top5 = cur.fetchall()
+            finally:
+                cur.close()
+
+            # convert sqlite rows
+            prod_totals_list = [{'id': r[0], 'name': r[1], 'total_qty': int(r[2])} for r in prod_totals]
+            most_obj = {'id': most[0], 'name': most[1], 'total_qty': int(most[2])} if most else None
+            least_obj = {'id': least[0], 'name': least[1], 'total_qty': int(least[2])} if least else None
+            cat_list = [{'category': r[0] or 'Other', 'total_amount': float(r[1]) if r[1] is not None else 0.0} for r in cat_break]
+            daily_list = [{'date': r[0], 'total': float(r[1]) if r[1] is not None else 0.0} for r in daily]
+            top5_list = [{'name': r[0], 'total_qty': int(r[1])} for r in top5]
+
+        return jsonify({'success': True, 'most_sold': most_obj, 'least_sold': least_obj, 'category_breakdown': cat_list, 'daily_totals': daily_list, 'top5_products': top5_list})
+    except Exception as exc:  # pylint: disable=broad-except
+        return jsonify({'success': False, 'message': str(exc)}), 500
+
+
 @app.route('/operations/add', methods=['POST'])
 def add_movement():
     """API to add a stock movement (daxilolma/itki).
@@ -427,13 +609,25 @@ def add_movement():
                 prod = cur.fetchone()
                 if prod is None:
                     return jsonify({'success': False, 'message': 'Məhsul tapılmadı'}), 404
-                current_stock = int(prod['stock'])
+                # Support both dict-like rows (RealDictCursor) and tuple rows
+                if isinstance(prod, dict):
+                    current_stock = int(prod.get('stock', 0))
+                else:
+                    # tuple-like
+                    current_stock = int(prod[0])
                 if movement_type == 'itki' and quantity > current_stock:
                     return jsonify({'success': False, 'message': 'Stokda kifayət qədər məhsul yoxdur.'}), 400
 
                 cur.execute('INSERT INTO stock_movements (product_id, type, quantity, note) VALUES (%s, %s, %s, %s) RETURNING id', (product_id, movement_type, quantity, note))
                 row = cur.fetchone()
-                movement_id = row['id'] if row and hasattr(row, 'get') else (row[0] if row else None)
+                # Support both dict-like rows (RealDictCursor) and tuple rows
+                if row is None:
+                    movement_id = None
+                elif isinstance(row, dict):
+                    movement_id = row.get('id')
+                else:
+                    # tuple-like
+                    movement_id = row[0]
                 if movement_type == 'daxilolma':
                     cur.execute('UPDATE products SET stock = stock + %s WHERE id = %s', (quantity, product_id))
                 else:
@@ -445,19 +639,23 @@ def add_movement():
         else:
             cur = conn.cursor()
             try:
-                prod = conn.execute('SELECT stock, name FROM products WHERE id = ?', (product_id,)).fetchone()
+                cur.execute('SELECT stock, name FROM products WHERE id = ?', (product_id,))
+                prod = cur.fetchone()
                 if prod is None:
                     return jsonify({'success': False, 'message': 'Məhsul tapılmadı'}), 404
-                current_stock = int(prod['stock'])
+                if isinstance(prod, dict):
+                    current_stock = int(prod.get('stock', 0))
+                else:
+                    current_stock = int(prod[0])
                 if movement_type == 'itki' and quantity > current_stock:
                     return jsonify({'success': False, 'message': 'Stokda kifayət qədər məhsul yoxdur.'}), 400
 
                 cur.execute('INSERT INTO stock_movements (product_id, type, quantity, note) VALUES (?, ?, ?, ?)', (product_id, movement_type, quantity, note))
                 movement_id = cur.lastrowid
                 if movement_type == 'daxilolma':
-                    conn.execute('UPDATE products SET stock = stock + ? WHERE id = ?', (quantity, product_id))
+                    cur.execute('UPDATE products SET stock = stock + ? WHERE id = ?', (quantity, product_id))
                 else:
-                    conn.execute('UPDATE products SET stock = stock - ? WHERE id = ?', (quantity, product_id))
+                    cur.execute('UPDATE products SET stock = stock - ? WHERE id = ?', (quantity, product_id))
                 conn.commit()
                 return jsonify({'success': True, 'id': movement_id})
             finally:
