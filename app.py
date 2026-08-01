@@ -122,6 +122,19 @@ def _create_tables_postgres(conn):
             )
             """
         )
+        # stock_movements table: records stock ins/outs (daxilolma/itki)
+        cur.execute(
+            """
+            CREATE TABLE IF NOT EXISTS stock_movements (
+                id SERIAL PRIMARY KEY,
+                product_id INTEGER NOT NULL REFERENCES products(id) ON DELETE RESTRICT,
+                type VARCHAR(20) NOT NULL,
+                quantity INTEGER NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                note TEXT
+            )
+            """
+        )
 
         cur.execute("SELECT COUNT(*) AS count FROM products")
         row = cur.fetchone()
@@ -211,6 +224,20 @@ def _create_tables_sqlite(conn):
             )
             """
         )
+        # stock_movements table for SQLite
+        cur.execute(
+            """
+            CREATE TABLE IF NOT EXISTS stock_movements (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                product_id INTEGER NOT NULL,
+                type TEXT NOT NULL,
+                quantity INTEGER NOT NULL,
+                created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+                note TEXT,
+                FOREIGN KEY (product_id) REFERENCES products(id)
+            )
+            """
+        )
         cur.execute("SELECT COUNT(*) AS count FROM products")
         row = cur.fetchone()
         existing_count = 0
@@ -294,6 +321,150 @@ def products_page():
         finally:
             cur.close()
     return render_template("products.html", products=products, categories=categories)
+
+
+@app.route('/operations')
+def operations_page():
+    """Render operations page: add stock movements and show combined history."""
+    init_db()
+    conn = get_db()
+    database_url, _ = get_db_config()
+    # load products for dropdown
+    if database_url:
+        cur = conn.cursor()
+        try:
+            cur.execute("SELECT id, name FROM products ORDER BY name")
+            products = cur.fetchall()
+        finally:
+            cur.close()
+    else:
+        cur = conn.cursor()
+        try:
+            cur.execute("SELECT id, name FROM products ORDER BY name")
+            products = cur.fetchall()
+        finally:
+            cur.close()
+
+    # fetch combined history (sales items + stock_movements)
+    history = []
+    if database_url:
+        cur = conn.cursor()
+        try:
+            # sales items
+            cur.execute(
+                """
+                SELECT s.created_at AS created_at, p.name AS product_name, 'sale' AS kind, si.quantity AS quantity,
+                       (si.unit_price * si.quantity) AS amount
+                FROM sale_items si
+                JOIN sales s ON si.sale_id = s.id
+                JOIN products p ON si.product_id = p.id
+                UNION ALL
+                SELECT sm.created_at AS created_at, p.name AS product_name, sm.type AS kind, sm.quantity AS quantity, NULL AS amount
+                FROM stock_movements sm
+                JOIN products p ON sm.product_id = p.id
+                ORDER BY created_at DESC
+                """
+            )
+            history = cur.fetchall()
+        finally:
+            cur.close()
+    else:
+        cur = conn.cursor()
+        try:
+            cur.execute(
+                """
+                SELECT s.created_at AS created_at, p.name AS product_name, 'sale' AS kind, si.quantity AS quantity,
+                       (si.unit_price * si.quantity) AS amount
+                FROM sale_items si
+                JOIN sales s ON si.sale_id = s.id
+                JOIN products p ON si.product_id = p.id
+                UNION ALL
+                SELECT sm.created_at AS created_at, p.name AS product_name, sm.type AS kind, sm.quantity AS quantity, NULL AS amount
+                FROM stock_movements sm
+                JOIN products p ON sm.product_id = p.id
+                ORDER BY created_at DESC
+                """
+            )
+            history = cur.fetchall()
+        finally:
+            cur.close()
+
+    return render_template('operations.html', products=products, history=history)
+
+
+@app.route('/operations/add', methods=['POST'])
+def add_movement():
+    """API to add a stock movement (daxilolma/itki).
+
+    Expects JSON: {product_id, type, quantity, note}
+    """
+    data = request.get_json(silent=True) or {}
+    try:
+        product_id_raw = data.get('product_id')
+        quantity_raw = data.get('quantity')
+        if product_id_raw is None or quantity_raw is None:
+            raise ValueError('missing')
+        product_id = int(product_id_raw)
+        movement_type = data.get('type')
+        quantity = int(quantity_raw)
+        note = data.get('note')
+    except Exception:
+        return jsonify({'success': False, 'message': 'Yanlış input'}), 400
+
+    if movement_type not in ('daxilolma', 'itki'):
+        return jsonify({'success': False, 'message': 'Növ səhvdir'}), 400
+    if quantity <= 0:
+        return jsonify({'success': False, 'message': 'Miqdar müsbət olmalıdır'}), 400
+
+    conn = get_db()
+    database_url, _ = get_db_config()
+    try:
+        if database_url:
+            cur = conn.cursor()
+            try:
+                # if itki, check stock
+                cur.execute('SELECT stock, name FROM products WHERE id = %s', (product_id,))
+                prod = cur.fetchone()
+                if prod is None:
+                    return jsonify({'success': False, 'message': 'Məhsul tapılmadı'}), 404
+                current_stock = int(prod['stock'])
+                if movement_type == 'itki' and quantity > current_stock:
+                    return jsonify({'success': False, 'message': 'Stokda kifayət qədər məhsul yoxdur.'}), 400
+
+                cur.execute('INSERT INTO stock_movements (product_id, type, quantity, note) VALUES (%s, %s, %s, %s) RETURNING id', (product_id, movement_type, quantity, note))
+                row = cur.fetchone()
+                movement_id = row['id'] if row and hasattr(row, 'get') else (row[0] if row else None)
+                if movement_type == 'daxilolma':
+                    cur.execute('UPDATE products SET stock = stock + %s WHERE id = %s', (quantity, product_id))
+                else:
+                    cur.execute('UPDATE products SET stock = stock - %s WHERE id = %s', (quantity, product_id))
+                conn.commit()
+                return jsonify({'success': True, 'id': movement_id})
+            finally:
+                cur.close()
+        else:
+            cur = conn.cursor()
+            try:
+                prod = conn.execute('SELECT stock, name FROM products WHERE id = ?', (product_id,)).fetchone()
+                if prod is None:
+                    return jsonify({'success': False, 'message': 'Məhsul tapılmadı'}), 404
+                current_stock = int(prod['stock'])
+                if movement_type == 'itki' and quantity > current_stock:
+                    return jsonify({'success': False, 'message': 'Stokda kifayət qədər məhsul yoxdur.'}), 400
+
+                cur.execute('INSERT INTO stock_movements (product_id, type, quantity, note) VALUES (?, ?, ?, ?)', (product_id, movement_type, quantity, note))
+                movement_id = cur.lastrowid
+                if movement_type == 'daxilolma':
+                    conn.execute('UPDATE products SET stock = stock + ? WHERE id = ?', (quantity, product_id))
+                else:
+                    conn.execute('UPDATE products SET stock = stock - ? WHERE id = ?', (quantity, product_id))
+                conn.commit()
+                return jsonify({'success': True, 'id': movement_id})
+            finally:
+                cur.close()
+    except Exception as exc:  # pylint: disable=broad-except
+        conn.rollback()
+        return jsonify({'success': False, 'message': str(exc)}), 500
 
 
 @app.route("/checkout", methods=["POST"])
