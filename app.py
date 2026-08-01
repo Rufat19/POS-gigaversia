@@ -210,24 +210,20 @@ def _create_tables_postgres(conn):
             """
         )
 
-        cur.execute("SELECT COUNT(*) AS count FROM products")
-        row = cur.fetchone()
-        pg_count = 0
-        if row is not None:
-            try:
-                # Support both mapping-like (RealDictCursor) and tuple rows
-                if not isinstance(row, tuple) and hasattr(row, "get"):
-                    pg_count = int(row.get("count", 0))
-                else:
-                    pg_count = int(row[0])
-            except (ValueError, TypeError):
-                pg_count = 0
-        if pg_count == 0:
-            insert_sql = (
-                "INSERT INTO products (name, category, price, stock, image_url) "
-                "VALUES (%s, %s, %s, %s, %s)"
-            )
-            for product in DEFAULT_PRODUCTS:
+        cur.execute("SELECT name FROM products")
+        existing_names = set()
+        for row in cur.fetchall():
+            if not isinstance(row, tuple) and hasattr(row, "get"):
+                existing_names.add(str(row.get("name", "")))
+            else:
+                existing_names.add(str(row[0]))
+
+        insert_sql = (
+            "INSERT INTO products (name, category, price, stock, image_url) "
+            "VALUES (%s, %s, %s, %s, %s)"
+        )
+        for product in DEFAULT_PRODUCTS:
+            if product[0] not in existing_names:
                 cur.execute(insert_sql, product)
         conn.commit()
     finally:
@@ -306,23 +302,22 @@ def _create_tables_sqlite(conn):
             )
             """
         )
-        cur.execute("SELECT COUNT(*) AS count FROM products")
-        row = cur.fetchone()
-        existing_count = 0
-        if row is not None:
-            try:
-                if isinstance(row, sqlite3.Row):
-                    existing_count = int(row["count"])  # type: ignore[index]
-                else:
-                    existing_count = int(row[0])
-            except (ValueError, TypeError):
-                existing_count = 0
-        if existing_count == 0:
-            insert_sql = (
-                "INSERT INTO products (name, category, price, stock, image_url) "
-                "VALUES (?, ?, ?, ?, ?)"
-            )
-            for product in DEFAULT_PRODUCTS:
+        cur.execute("SELECT name FROM products")
+        existing_names = set()
+        for row in cur.fetchall():
+            if isinstance(row, sqlite3.Row):
+                existing_names.add(str(row["name"]))
+            elif not isinstance(row, tuple) and hasattr(row, "get"):
+                existing_names.add(str(row.get("name", "")))
+            else:
+                existing_names.add(str(row[0]))
+
+        insert_sql = (
+            "INSERT INTO products (name, category, price, stock, image_url) "
+            "VALUES (?, ?, ?, ?, ?)"
+        )
+        for product in DEFAULT_PRODUCTS:
+            if product[0] not in existing_names:
                 cur.execute(insert_sql, product)
         conn.commit()
     finally:
