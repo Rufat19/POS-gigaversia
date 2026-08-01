@@ -1,8 +1,14 @@
+"""Seed script to populate the products table with a provided product list.
+
+This script works with either PostgreSQL (when DATABASE_URL is set) or local
+SQLite (SQLITE_DB_PATH). It recreates the products rows (DELETE + INSERT).
+"""
+
 import os
 from pathlib import Path
+import sqlite3
 
 import psycopg2
-import sqlite3
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -12,12 +18,17 @@ SQLITE_DB_PATH = os.getenv("SQLITE_DB_PATH", str(Path(__file__).parent / "app.db
 
 
 def get_connection():
+    """Return a DB connection (Postgres if DATABASE_URL set, else SQLite)."""
     if DATABASE_URL:
         return psycopg2.connect(DATABASE_URL)
     return sqlite3.connect(SQLITE_DB_PATH)
 
 
 def seed_products():
+    """Populate the products table with a fixed product list.
+
+    WARNING: this function deletes existing rows in the products table.
+    """
     conn = get_connection()
     try:
         # Full product list derived from user-provided data. Default stock=50 for most items.
@@ -109,7 +120,11 @@ def seed_products():
                 )
                 cur.execute("DELETE FROM products")
                 for p in products:
-                    cur.execute("INSERT INTO products (name, category, price, stock) VALUES (%s, %s, %s, %s)", p)
+                    cur.execute(
+                        "INSERT INTO products (name, category, price, stock) "
+                        "VALUES (%s, %s, %s, %s)",
+                        p,
+                    )
                 conn.commit()
         else:
             conn.execute(
@@ -125,7 +140,11 @@ def seed_products():
             )
             conn.execute("DELETE FROM products")
             for p in products:
-                conn.execute("INSERT INTO products (name, category, price, stock) VALUES (?, ?, ?, ?)", p)
+                conn.execute(
+                    "INSERT INTO products (name, category, price, stock) "
+                    "VALUES (?, ?, ?, ?)",
+                    p,
+                )
             conn.commit()
 
         print(f"{len(products)} məhsul əlavə edildi.")

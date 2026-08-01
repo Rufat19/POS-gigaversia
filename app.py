@@ -65,74 +65,96 @@ def close_db(exc=None):
         db.close()
 
 
-def init_db():
-    """Initialize database tables for products, sales and sale_items.
+def _create_tables_postgres(conn):
+    """Create tables and seed initial products for PostgreSQL.
 
-    Creates tables if they do not exist. Works for both PostgreSQL and SQLite.
+    Separated from init_db to reduce function complexity and keep DB-specific
+    logic isolated.
     """
-    conn = get_db()
-    database_url, _ = get_db_config()
+    cur = conn.cursor()
+    try:
+        cur.execute(
+            """
+            CREATE TABLE IF NOT EXISTS products (
+                id SERIAL PRIMARY KEY,
+                name VARCHAR(200) NOT NULL,
+                category VARCHAR(50) DEFAULT 'Other',
+                price NUMERIC(10,2) NOT NULL,
+                stock INT NOT NULL DEFAULT 0
+            )
+            """
+        )
+        # Ensure category column exists (for older DBs)
+        try:
+            alter_sql = (
+                "ALTER TABLE products ADD COLUMN IF NOT EXISTS category "
+                "VARCHAR(50) DEFAULT 'Other'"
+            )
+            cur.execute(alter_sql)
+        except (psycopg2.Error, sqlite3.Error):
+            # If ALTER fails (older Postgres/permissions), ignore and continue
+            pass
 
-    if database_url:
-        with conn.cursor() as cur:
-            cur.execute(
-                """
-                CREATE TABLE IF NOT EXISTS products (
-                    id SERIAL PRIMARY KEY,
-                    name VARCHAR(200) NOT NULL,
-                    category VARCHAR(50) DEFAULT 'Other',
-                    price NUMERIC(10,2) NOT NULL,
-                    stock INT NOT NULL DEFAULT 0
-                )
-                """
+        cur.execute(
+            """
+            CREATE TABLE IF NOT EXISTS sales (
+                id SERIAL PRIMARY KEY,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                total_amount NUMERIC(10,2) NOT NULL
             )
-            # Ensure category column exists (for older DBs)
+            """
+        )
+        cur.execute(
+            """
+            CREATE TABLE IF NOT EXISTS sale_items (
+                id SERIAL PRIMARY KEY,
+                sale_id INTEGER NOT NULL REFERENCES sales(id) ON DELETE CASCADE,
+                product_id INTEGER NOT NULL REFERENCES products(id) ON DELETE RESTRICT,
+                quantity INT NOT NULL,
+                unit_price NUMERIC(10,2) NOT NULL
+            )
+            """
+        )
+
+        cur.execute("SELECT COUNT(*) AS count FROM products")
+        row = cur.fetchone()
+        pg_count = 0
+        if row is not None:
             try:
-                alter_sql = (
-                    "ALTER TABLE products ADD COLUMN IF NOT EXISTS category "
-                    "VARCHAR(50) DEFAULT 'Other'"
-                )
-                cur.execute(alter_sql)
-            except (psycopg2.Error, sqlite3.Error):
-                # If ALTER fails (older Postgres/permissions), ignore and continue
-                pass
+                # Support both mapping-like (RealDictCursor) and tuple rows
+                if not isinstance(row, tuple) and hasattr(row, "get"):
+                    pg_count = int(row.get("count", 0))
+                else:
+                    pg_count = int(row[0])
+            except (ValueError, TypeError):
+                pg_count = 0
+        if pg_count == 0:
             cur.execute(
-                """
-                CREATE TABLE IF NOT EXISTS sales (
-                    id SERIAL PRIMARY KEY,
-                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    total_amount NUMERIC(10,2) NOT NULL
-                )
-                """
+                "INSERT INTO products (name, price, stock) VALUES (%s, %s, %s)",
+                ("Kofe", 12.50, 20),
             )
             cur.execute(
-                """
-                CREATE TABLE IF NOT EXISTS sale_items (
-                    id SERIAL PRIMARY KEY,
-                    sale_id INTEGER NOT NULL REFERENCES sales(id) ON DELETE CASCADE,
-                    product_id INTEGER NOT NULL REFERENCES products(id) ON DELETE RESTRICT,
-                    quantity INT NOT NULL,
-                    unit_price NUMERIC(10,2) NOT NULL
-                )
-                """
+                "INSERT INTO products (name, price, stock) VALUES (%s, %s, %s)",
+                ("Su", 2.50, 100),
             )
-            cur.execute("SELECT COUNT(*) AS count FROM products")
-            if cur.fetchone()["count"] == 0:
-                cur.execute(
-                    "INSERT INTO products (name, price, stock) VALUES (%s, %s, %s)",
-                    ("Kofe", 12.50, 20),
-                )
-                cur.execute(
-                    "INSERT INTO products (name, price, stock) VALUES (%s, %s, %s)",
-                    ("Su", 2.50, 100),
-                )
-                cur.execute(
-                    "INSERT INTO products (name, price, stock) VALUES (%s, %s, %s)",
-                    ("Çörək", 4.00, 50),
-                )
-            conn.commit()
-    else:
-        conn.execute(
+            cur.execute(
+                "INSERT INTO products (name, price, stock) VALUES (%s, %s, %s)",
+                ("Çörək", 4.00, 50),
+            )
+        conn.commit()
+    finally:
+        cur.close()
+
+
+def _create_tables_sqlite(conn):
+    """Create tables and seed initial products for SQLite.
+
+    Separated from init_db to reduce function complexity and keep DB-specific
+    logic isolated.
+    """
+    cur = conn.cursor()
+    try:
+        cur.execute(
             """
             CREATE TABLE IF NOT EXISTS products (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -144,15 +166,17 @@ def init_db():
             """
         )
         # Add category column if missing (SQLite)
-        cols = [row[1] for row in conn.execute("PRAGMA table_info('products')").fetchall()]
+        cur.execute("PRAGMA table_info('products')")
+        cols = [row[1] for row in cur.fetchall()]
         if 'category' not in cols:
             try:
                 alter_sql = ("ALTER TABLE products ADD COLUMN category TEXT "
                              "DEFAULT 'Other'")
-                conn.execute(alter_sql)
+                cur.execute(alter_sql)
             except sqlite3.Error:
                 pass
-        conn.execute(
+
+        cur.execute(
             """
             CREATE TABLE IF NOT EXISTS sales (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -161,7 +185,7 @@ def init_db():
             )
             """
         )
-        conn.execute(
+        cur.execute(
             """
             CREATE TABLE IF NOT EXISTS sale_items (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -174,21 +198,50 @@ def init_db():
             )
             """
         )
-        existing_count = conn.execute("SELECT COUNT(*) AS count FROM products").fetchone()["count"]
+        cur.execute("SELECT COUNT(*) AS count FROM products")
+        row = cur.fetchone()
+        existing_count = 0
+        if row is not None:
+            try:
+                # sqlite3.Row supports mapping access by column name. Use
+                # an isinstance check to satisfy type checkers before
+                # indexing by key.
+                if isinstance(row, sqlite3.Row):
+                    existing_count = int(row["count"])  # type: ignore[index]
+                else:
+                    existing_count = int(row[0])
+            except (ValueError, TypeError):
+                existing_count = 0
         if existing_count == 0:
-            conn.execute(
+            cur.execute(
                 "INSERT INTO products (name, price, stock) VALUES (?, ?, ?)",
                 ("Kofe", 12.50, 20),
             )
-            conn.execute(
+            cur.execute(
                 "INSERT INTO products (name, price, stock) VALUES (?, ?, ?)",
                 ("Su", 2.50, 100),
             )
-            conn.execute(
+            cur.execute(
                 "INSERT INTO products (name, price, stock) VALUES (?, ?, ?)",
                 ("Çörək", 4.00, 50),
             )
         conn.commit()
+    finally:
+        cur.close()
+
+
+def init_db():
+    """Initialize database tables for products, sales and sale_items.
+
+    Creates tables if they do not exist. Works for both PostgreSQL and SQLite.
+    """
+    conn = get_db()
+    database_url, _ = get_db_config()
+
+    if database_url:
+        _create_tables_postgres(conn)
+    else:
+        _create_tables_sqlite(conn)
 
 
 @app.route("/")
@@ -202,22 +255,31 @@ def products_page():
     conn = get_db()
     database_url, _ = get_db_config()
     if database_url:
-        with conn.cursor() as cur:
+        cur = conn.cursor()
+        try:
             cur.execute("SELECT id, name, category, price, stock FROM products ORDER BY id")
             products = cur.fetchall()
             cur.execute("SELECT DISTINCT category FROM products ORDER BY category")
-            categories = [r['category'] for r in cur.fetchall()]
+            categories = [r[0] for r in cur.fetchall()]
+        finally:
+            cur.close()
     else:
         products_sql = (
             "SELECT id, name, category, price, stock "
             "FROM products ORDER BY id"
         )
-        products = conn.execute(products_sql).fetchall()
-        categories_sql = (
-            "SELECT DISTINCT category FROM products "
-            "ORDER BY category"
-        )
-        categories = [r[0] for r in conn.execute(categories_sql).fetchall()]
+        cur = conn.cursor()
+        try:
+            cur.execute(products_sql)
+            products = cur.fetchall()
+            categories_sql = (
+                "SELECT DISTINCT category FROM products "
+                "ORDER BY category"
+            )
+            cur.execute(categories_sql)
+            categories = [r[0] for r in cur.fetchall()]
+        finally:
+            cur.close()
     return render_template("products.html", products=products, categories=categories)
 
 
@@ -260,7 +322,8 @@ def _checkout_postgres(conn, cart):
     product stock. Raises ValueError for client errors (bad payload or stock
     shortage) so the caller can return 400.
     """
-    with conn.cursor() as cur:
+    cur = conn.cursor()
+    try:
         total_amount = 0.0
         # validate and compute total
         for item in cart:
@@ -305,6 +368,8 @@ def _checkout_postgres(conn, cart):
             cur.execute(update_stock_sql, (quantity, product_id))
 
         conn.commit()
+    finally:
+        cur.close()
 
 
 def _checkout_sqlite(conn, cart):
