@@ -226,4 +226,8 @@ def checkout():
 
 
 if __name__ == "__main__":
-    app.run(debug=True, host="0.0.0.0", port=5000)
+    # Read port from environment (e.g., Railway provides $PORT). Fallback to 5000 for local dev.
+    port = int(os.getenv("PORT", 5000))
+    # Allow controlling debug mode via FLASK_DEBUG env var (optional)
+    debug_env = os.getenv("FLASK_DEBUG", "False").lower() in ("1", "true", "yes")
+    app.run(debug=debug_env, host="0.0.0.0", port=port)

@@ -36,7 +36,7 @@
           <td>{{ product.id }}</td>
           <td>{{ product.name }}</td>
           <td>{{ "%.2f" | format(product.price) }}</td>
-          <td>{{ product.stock }}</td>
+          <td id="stock-{{ product.id }}">{{ product.stock }}</td>
           <td>
             <input type="number" min="1" value="1" class="qty-input" id="qty-{{ product.id }}">
           </td>
@@ -85,7 +85,16 @@
           return;
         }
 
+        // Check available stock on the page (best-effort client-side check)
+        const stockEl = document.getElementById('stock-' + id);
+        const available = stockEl ? Number(stockEl.textContent || 0) : null;
         const existing = cart.find(item => item.id === id);
+        const alreadyInCart = existing ? existing.quantity : 0;
+        if (available !== null && (quantity + alreadyInCart) > available) {
+          alert('Seçilən miqdar mövcud stokdan çoxdur.');
+          return;
+        }
+
         if (existing) {
           existing.quantity += quantity;
         } else {
@@ -153,10 +162,21 @@
             throw new Error(result.message || 'Satış uğursuz oldu.');
           }
 
-          messageBox.textContent = result.message;
+          // Success: update stocks in the page (without full reload) and clear cart
+          messageBox.textContent = result.message || 'Satış tamamlandı!';
+
+          // Decrease displayed stock for each cart item
+          cart.forEach(item => {
+            const stockEl = document.getElementById('stock-' + item.id);
+            if (stockEl) {
+              const current = Number(stockEl.textContent || 0);
+              stockEl.textContent = Math.max(0, current - item.quantity);
+            }
+          });
+
+          // Clear cart and re-render
           cart.length = 0;
           renderCart();
-          window.location.reload();
         } catch (error) {
           messageBox.textContent = error.message;
         }
