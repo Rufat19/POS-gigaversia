@@ -5,16 +5,35 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>POS - Məhsul siyahısı</title>
     <style>
-      body { font-family: Arial, sans-serif; margin: 40px; }
-      table { border-collapse: collapse; width: 100%; margin-bottom: 24px; }
-      th, td { border: 1px solid #ccc; padding: 10px; text-align: left; }
-      th { background: #f5f5f5; }
-      .cart-box { border: 1px solid #ddd; padding: 16px; background: #fafafa; }
-      .cart-box h2 { margin-top: 0; }
-      .qty-input { width: 70px; padding: 6px; }
-      .btn { padding: 6px 10px; cursor: pointer; }
-      .remove-btn { background: #e74c3c; color: white; border: none; }
-      .total { font-weight: bold; font-size: 18px; margin-top: 10px; }
+      :root{--bg:#f6f3f0;--card:#ffffff;--accent:#ff7b2d;--muted:#7a7a7a}
+      *{box-sizing:border-box}
+      body{font-family:Inter, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial; margin:0;background:var(--bg);color:#222}
+      .container{max-width:1200px;margin:28px auto;padding:20px}
+      .header{display:flex;align-items:center;gap:12px;margin-bottom:18px}
+      .logo{font-weight:800;font-size:22px;color:#333}
+      .sub{color:var(--muted);font-size:13px}
+      .page{display:flex;gap:20px}
+      main{flex:1}
+      aside{width:360px}
+      .filters{display:flex;gap:8px;flex-wrap:wrap}
+      .btn{background:#fff;border:1px solid #eee;padding:8px 12px;border-radius:8px;cursor:pointer}
+      .btn.primary{background:var(--accent);color:#fff;border:none}
+      .products-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:16px}
+      .card{background:var(--card);border-radius:10px;padding:12px;box-shadow:0 6px 20px rgba(24,24,24,0.04);display:flex;flex-direction:column}
+      .thumb{height:110px;border-radius:8px;background:linear-gradient(180deg,#fdebd8,#f7e6de);display:flex;align-items:center;justify-content:center;color:#c88;margin-bottom:10px;font-weight:700}
+      .title{font-weight:700;margin-bottom:4px}
+      .meta{font-size:13px;color:var(--muted);margin-bottom:8px}
+      .row{display:flex;justify-content:space-between;align-items:center}
+      .qty-input{width:72px;padding:8px;border-radius:8px;border:1px solid #eee}
+      .card .actions{display:flex;gap:8px;margin-top:10px}
+      .cart-box{background:var(--card);padding:18px;border-radius:10px;box-shadow:0 6px 24px rgba(24,24,24,0.05)}
+      .cart-list{max-height:420px;overflow:auto;margin-bottom:12px}
+      .cart-item{display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid #f1f1f1}
+      .cart-item .left{display:flex;gap:8px;align-items:center}
+      .cart-item .name{font-weight:600}
+      .cart-total{font-weight:800;font-size:18px;margin-top:8px}
+      .checkout-msg{margin-top:10px;font-weight:700}
+      @media(max-width:900px){.page{flex-direction:column}aside{width:100%}}
     </style>
   </head>
   <body>
@@ -68,13 +87,19 @@
     </div>
 
     <script>
+      // App JS - improved and organized
       const cart = [];
+
       function filterCategory(cat) {
-        const cards = document.querySelectorAll('#products-grid .card');
+        const cards = document.querySelectorAll('.products-grid .card');
         cards.forEach(c => {
           if (cat === 'All' || c.dataset.category === cat) c.style.display = '';
           else c.style.display = 'none';
         });
+        // highlight active
+        document.querySelectorAll('.filters .btn').forEach(b => b.classList.remove('filter-active'));
+        const active = Array.from(document.querySelectorAll('.filters .btn')).find(b => b.textContent.trim()===cat || (cat==='All' && b.textContent.trim()==='Bütün məhsullar'));
+        if(active) active.classList.add('filter-active');
       }
 
       function addToCart(button) {
@@ -84,107 +109,59 @@
         const qtyInput = document.getElementById('qty-' + id);
         const quantity = Number(qtyInput.value || 1);
 
-        if (quantity < 1) {
-          alert('Miqdar 1-dən az ola bilməz.');
-          return;
-        }
+        if (quantity < 1) { alert('Miqdar 1-dən az ola bilməz.'); return; }
 
-        // Check available stock on the page (best-effort client-side check)
         const stockEl = document.getElementById('stock-' + id);
         const available = stockEl ? Number(stockEl.textContent || 0) : null;
         const existing = cart.find(item => item.id === id);
         const alreadyInCart = existing ? existing.quantity : 0;
-        if (available !== null && (quantity + alreadyInCart) > available) {
-          alert('Seçilən miqdar mövcud stokdan çoxdur.');
-          return;
-        }
+        if (available !== null && (quantity + alreadyInCart) > available) { alert('Seçilən miqdar mövcud stokdan çoxdur.'); return; }
 
-        if (existing) {
-          existing.quantity += quantity;
-        } else {
-          cart.push({ id, name, price, quantity });
-        }
-
+        if (existing) existing.quantity += quantity; else cart.push({ id, name, price, quantity });
         renderCart();
       }
 
-      function removeFromCart(index) {
-        cart.splice(index, 1);
-        renderCart();
-      }
+      function removeFromCart(index) { cart.splice(index,1); renderCart(); }
 
-      function renderCart() {
+      function renderCart(){
         const cartItems = document.getElementById('cart-items');
         const cartTotal = document.getElementById('cart-total');
+        if(cart.length===0){ cartItems.innerHTML='Səbət hələ boşdur.'; cartTotal.textContent='Ümumi məbləğ: 0.00 AZN'; return; }
 
-        if (cart.length === 0) {
-          cartItems.innerHTML = 'Səbət hələ boşdur.';
-          cartTotal.textContent = 'Ümumi məbləğ: 0.00 AZN';
-          return;
-        }
-
-        let html = '<table><thead><tr><th>Ad</th><th>Miqdar</th><th>Vahid qiymət</th><th>Cəmi</th><th></th></tr></thead><tbody>';
-        let total = 0;
-
-        cart.forEach((item, index) => {
-          const lineTotal = item.price * item.quantity;
-          total += lineTotal;
-          html += `
-            <tr>
-              <td>${item.name}</td>
-              <td>${item.quantity}</td>
-              <td>${item.price.toFixed(2)} AZN</td>
-              <td>${lineTotal.toFixed(2)} AZN</td>
-              <td><button class="btn remove-btn" type="button" onclick="removeFromCart(${index})">Sil</button></td>
-            </tr>
-          `;
+        const list = document.createElement('div'); list.className='cart-list';
+        let total=0;
+        cart.forEach((item, idx)=>{
+          const line = document.createElement('div'); line.className='cart-item';
+          const left = document.createElement('div'); left.className='left';
+          const name = document.createElement('div'); name.className='name'; name.textContent=item.name;
+          const qty = document.createElement('div'); qty.textContent='×'+item.quantity;
+          left.append(name, qty);
+          const right = document.createElement('div');
+          const price = document.createElement('div'); price.textContent=(item.price*item.quantity).toFixed(2)+' AZN';
+          const del = document.createElement('button'); del.className='btn'; del.textContent='Sil'; del.onclick=()=>removeFromCart(idx);
+          right.append(price, del);
+          line.append(left,right);
+          list.appendChild(line);
+          total+=item.price*item.quantity;
         });
-
-        html += '</tbody></table>';
-        cartItems.innerHTML = html;
-        cartTotal.textContent = `Ümumi məbləğ: ${total.toFixed(2)} AZN`;
+        cartItems.innerHTML=''; cartItems.appendChild(list);
+        cartTotal.textContent=`Ümumi məbləğ: ${total.toFixed(2)} AZN`;
       }
 
-      async function checkout() {
-        if (cart.length === 0) {
-          alert('Səbət boşdur.');
-          return;
-        }
-
-        const messageBox = document.getElementById('checkout-message');
-        messageBox.textContent = 'Satış yazılır...';
-
-        try {
-          const response = await fetch('/checkout', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ cart })
-          });
-
-          const result = await response.json();
-          if (!response.ok) {
-            throw new Error(result.message || 'Satış uğursuz oldu.');
-          }
-
-          // Success: update stocks in the page (without full reload) and clear cart
+      async function checkout(){
+        if(cart.length===0){ alert('Səbət boşdur.'); return; }
+        const messageBox=document.getElementById('checkout-message'); messageBox.textContent='Satış yazılır...';
+        try{
+          const response = await fetch('/checkout',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({cart})});
+          const result = await response.json(); if(!response.ok) throw new Error(result.message||'Satış uğursuz oldu.');
           messageBox.textContent = result.message || 'Satış tamamlandı!';
-
-          // Decrease displayed stock for each cart item
-          cart.forEach(item => {
-            const stockEl = document.getElementById('stock-' + item.id);
-            if (stockEl) {
-              const current = Number(stockEl.textContent || 0);
-              stockEl.textContent = Math.max(0, current - item.quantity);
-            }
-          });
-
-          // Clear cart and re-render
-          cart.length = 0;
-          renderCart();
-        } catch (error) {
-          messageBox.textContent = error.message;
-        }
+          cart.forEach(item=>{ const stockEl=document.getElementById('stock-'+item.id); if(stockEl){ const current=Number(stockEl.textContent||0); stockEl.textContent=Math.max(0,current-item.quantity); } });
+          cart.length=0; renderCart();
+        }catch(err){ messageBox.textContent=err.message; }
       }
+
+      // init default filter
+      document.addEventListener('DOMContentLoaded',()=>{ filterCategory('All'); });
     </script>
   </body>
 </html>
