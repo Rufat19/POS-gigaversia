@@ -20,6 +20,79 @@ load_dotenv()
 app = Flask(__name__)
 app.config["JSON_SORT_KEYS"] = False
 
+DEFAULT_PRODUCTS = [
+    ("Cola 0.5", "Drinks", 2.00, 50, None),
+    ("Cola banka", "Drinks", 2.50, 50, None),
+    ("Pepsi banka", "Drinks", 2.50, 50, None),
+    ("Ice Coffee", "Drinks", 2.50, 50, None),
+    ("Fuse Tea 0.5", "Drinks", 2.00, 50, None),
+    ("Red bul", "Drinks", 5.00, 50, None),
+    ("Moxito", "Drinks", 2.00, 50, None),
+    ("Bizon Hell", "Drinks", 1.40, 50, None),
+    ("Sirab 0.5", "Drinks", 1.00, 50, None),
+    ("Sirab 1 lt", "Drinks", 1.50, 50, None),
+    ("Sirab Qazlı 0.5", "Drinks", 1.00, 50, None),
+    ("SARIKIZ", "Drinks", 1.00, 50, None),
+    ("Natura təbii şirə", "Drinks", 1.40, 50, None),
+    ("Lovita Peçenye", "Snacks", 5.00, 50, None),
+    ("Crax Böyük", "Snacks", 2.00, 50, None),
+    ("TUC", "Snacks", 3.50, 50, None),
+    ("7 Days", "Snacks", 2.00, 50, None),
+    ("OZMO fun", "Snacks", 2.20, 50, None),
+    ("OZMO Cornet", "Snacks", 1.60, 50, None),
+    ("OZMO yumurta", "Snacks", 3.00, 50, None),
+    ("Snickers, Mars, Twix", "Snacks", 2.40, 50, None),
+    ("Albeni şokolad", "Snacks", 2.40, 50, None),
+    ("Hoşbeş", "Snacks", 1.20, 50, None),
+    ("Ozmo ogopogo", "Snacks", 1.20, 50, None),
+    ("POP cake", "Snacks", 1.20, 50, None),
+    ("Barni", "Snacks", 2.00, 50, None),
+    ("LAYS", "Snacks", 5.00, 50, None),
+    ("Chetos", "Snacks", 4.00, 50, None),
+    ("Yummy gummy", "Snacks", 2.50, 50, None),
+    ("Biskolata mood", "Snacks", 4.00, 50, None),
+    ("Biskolata  Stick", "Snacks", 2.50, 50, None),
+    ("Chupa Chups", "Snacks", 1.50, 50, None),
+    ("Chupa Chups Vata", "Snacks", 2.50, 50, None),
+    ("Nut GO", "Snacks", 2.00, 50, None),
+    ("Marshmallow rainbow", "Snacks", 3.00, 50, None),
+    ("Morsok", "Snacks", 3.50, 50, None),
+    ("Kinder Surprise", "Snacks", 4.00, 50, None),
+    ("Rainbow", "Snacks", 1.00, 50, None),
+    ("Dirol", "Snacks", 1.00, 50, None),
+    ("ŞOKOLAD", "Snacks", 1.50, 50, None),
+    ("ŞOKOLAD balaca", "Snacks", 1.00, 50, None),
+    ("Xrusteam", "Snacks", 2.00, 50, None),
+    ("BALMİTO", "Snacks", 2.00, 50, None),
+    ("KİT-KAT", "Snacks", 4.00, 50, None),
+    ("MİLKA", "Snacks", 5.00, 50, None),
+    ("ƏTİR", "Other", 6.00, 50, None),
+    ("OREO", "Snacks", 3.50, 50, None),
+    ("Yubileynoe peçenye şokolad", "Snacks", 2.70, 50, None),
+    ("Yubileynoe peçenye sadə", "Snacks", 2.20, 50, None),
+    ("Lovita balaca", "Snacks", 3.00, 50, None),
+    ("Balık kreker", "Snacks", 2.00, 50, None),
+    ("Biskolata starz", "Snacks", 3.00, 50, None),
+    ("İkram", "Snacks", 2.00, 50, None),
+    ("Mentos duo", "Snacks", 2.50, 50, None),
+    ("Bambbar shok  50 gr", "Protein", 5.00, 50, None),
+    ("Snaqfabrique 55 gr", "Protein", 4.50, 50, None),
+    ("Snager 50 gr", "Protein", 4.00, 50, None),
+    ("Pritein delice 60 gr", "Protein", 4.00, 50, None),
+    ("Bombbar wafer 45 gr", "Protein", 4.00, 50, None),
+    ("Fitness shock 50 gr", "Protein", 4.00, 50, None),
+    ("Bombbar l-carnitine", "Protein", 5.00, 50, None),
+    ("Bambbar protein chips", "Protein", 4.00, 50, None),
+    ("Boul", "Salads", 8.00, 50, None),
+    ("Sezar Salat", "Salads", 8.00, 50, None),
+    ("Club Sendvich", "Fastfood", 7.00, 50, None),
+    ("Burger", "Fastfood", 6.00, 50, None),
+    ("Sezar Roll", "Fastfood", 7.00, 50, None),
+    ("Bulka", "Fastfood", 2.50, 50, None),
+    ("Bulka 3₼", "Fastfood", 3.00, 50, None),
+    ("Sirab 1.5", "Drinks", 2.00, 50, None),
+]
+
 
 def get_db_config():
     """Return database configuration tuple (DATABASE_URL, SQLITE_DB_PATH).
@@ -150,18 +223,12 @@ def _create_tables_postgres(conn):
             except (ValueError, TypeError):
                 pg_count = 0
         if pg_count == 0:
-            cur.execute(
-                "INSERT INTO products (name, price, stock, image_url) VALUES (%s, %s, %s, %s)",
-                ("Kofe", 12.50, 20, None),
+            insert_sql = (
+                "INSERT INTO products (name, category, price, stock, image_url) "
+                "VALUES (%s, %s, %s, %s, %s)"
             )
-            cur.execute(
-                "INSERT INTO products (name, price, stock, image_url) VALUES (%s, %s, %s, %s)",
-                ("Su", 2.50, 100, None),
-            )
-            cur.execute(
-                "INSERT INTO products (name, price, stock, image_url) VALUES (%s, %s, %s, %s)",
-                ("Çörək", 4.00, 50, None),
-            )
+            for product in DEFAULT_PRODUCTS:
+                cur.execute(insert_sql, product)
         conn.commit()
     finally:
         cur.close()
@@ -244,9 +311,6 @@ def _create_tables_sqlite(conn):
         existing_count = 0
         if row is not None:
             try:
-                # sqlite3.Row supports mapping access by column name. Use
-                # an isinstance check to satisfy type checkers before
-                # indexing by key.
                 if isinstance(row, sqlite3.Row):
                     existing_count = int(row["count"])  # type: ignore[index]
                 else:
@@ -254,18 +318,12 @@ def _create_tables_sqlite(conn):
             except (ValueError, TypeError):
                 existing_count = 0
         if existing_count == 0:
-            cur.execute(
-                "INSERT INTO products (name, price, stock, image_url) VALUES (?, ?, ?, ?)",
-                ("Kofe", 12.50, 20, None),
+            insert_sql = (
+                "INSERT INTO products (name, category, price, stock, image_url) "
+                "VALUES (?, ?, ?, ?, ?)"
             )
-            cur.execute(
-                "INSERT INTO products (name, price, stock, image_url) VALUES (?, ?, ?, ?)",
-                ("Su", 2.50, 100, None),
-            )
-            cur.execute(
-                "INSERT INTO products (name, price, stock, image_url) VALUES (?, ?, ?, ?)",
-                ("Çörək", 4.00, 50, None),
-            )
+            for product in DEFAULT_PRODUCTS:
+                cur.execute(insert_sql, product)
         conn.commit()
     finally:
         cur.close()
