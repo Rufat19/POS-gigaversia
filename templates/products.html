@@ -5,58 +5,28 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>POS - Məhsul siyahısı</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
-    <style>
-      .checkout-actions { margin-top:12px; display:flex; gap:8px; }
-      .add-product-form { margin-top:12px; padding:12px; background:#fff; border-radius:8px; box-shadow:0 1px 4px rgba(0,0,0,0.03); }
-      .add-product-form h3 { margin:0 0 8px 0; }
-      .add-product-inputs { display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
-      .add-product-inputs input { padding:8px; border-radius:6px; border:1px solid #eee; }
-      .add-product-inputs input:nth-child(1) { flex:1; }
-      .add-product-inputs input:nth-child(2) { width:160px; }
-      .add-product-inputs input:nth-child(3) { width:120px; }
-      .add-product-inputs input:nth-child(4) { width:100px; }
-      .add-product-inputs input:nth-child(5) { width:220px; }
-      .add-product-btn { background:#28a745; color:#fff; border:none; padding:8px 12px; border-radius:6px; }
-      .add-product-msg { margin-top:8px; font-size:13px; color:#666; }
-      .add-product-section { margin-top:12px; padding:12px; background:#fff; border-radius:8px; box-shadow:0 1px 4px rgba(0,0,0,0.03); }
-      .add-product-section h3 { margin:0 0 8px 0; }
-      .add-product-section-flex { display:flex;gap:8px;flex-wrap:wrap;align-items:center; }
-      .add-product-section-flex input { padding:8px;border-radius:6px;border:1px solid #eee; }
-      .add-product-section-flex input:nth-child(1) { flex:1; }
-      .add-product-section-flex input:nth-child(2) { width:160px; }
-      .add-product-section-flex input:nth-child(3) { width:120px; }
-      .add-product-section-flex input:nth-child(4) { width:100px; }
-      .add-product-section-flex input:nth-child(5) { width:220px; }
-      #add-product-msg { margin-top:8px;font-size:13px;color:#666; }
-      .new-product-form-container { margin-top:12px; padding:12px; background:#fff; border-radius:8px; box-shadow:0 1px 4px rgba(0,0,0,0.03); }
-      .new-product-form-container h3 { margin:0 0 8px 0; }
-      .new-product-form-inputs { display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
-      .new-product-form-inputs input { padding:8px; border-radius:6px; border:1px solid #eee; }
-      .new-product-form-inputs input:nth-child(1) { flex:1; }
-      .new-product-form-inputs input:nth-child(2) { width:160px; }
-      .new-product-form-inputs input:nth-child(3) { width:120px; }
-      .new-product-form-inputs input:nth-child(4) { width:100px; }
-      .new-product-form-inputs input:nth-child(5) { width:220px; }
-      .nav-bar { margin-top:6px; margin-bottom:12px; }
-    </style>
 
   </head>
   <body>
-    <h1>POS - Kiosk (Touch-friendly)</h1>
-    <div class="nav-bar">
-      <a href="/">Məhsullar</a> | <a href="/operations">Əməliyyatlar</a> | <a href="/reports">Hesabatlar</a>
+    <div class="page-header">
+      <div class="page-title">
+        <h1>POS Kiosk</h1>
+        <p class="page-subtitle">Müştəri sifarişləri üçün professional POS təcrübəsi</p>
+      </div>
+      <nav class="page-nav">
+        <a href="/" class="active">Məhsullar</a>
+        <a href="/operations">Əməliyyatlar</a>
+        <a href="/reports">Hesabatlar</a>
+      </nav>
     </div>
-    <nav class="nav-bar">
-      <a href="/">Məhsullar</a> | <a href="/operations">Əməliyyatlar</a>
-    </nav>
 
     <div class="layout-row">
       <main>
         <section class="section-filters">
           <div class="filters-flex">
-            <button class="btn" onclick="filterCategory('All')">Bütün məhsullar</button>
+            <button class="btn filter-btn" data-category="All" data-base="Bütün məhsullar" onclick="filterCategory('All')">Bütün məhsullar</button>
             {% for cat in categories %}
-              <button class="btn" onclick="filterCategory('{{ cat }}')">{{ cat }}</button>
+              <button class="btn filter-btn" data-category="{{ cat }}" data-base="{{ cat }}" onclick="filterCategory('{{ cat }}')">{{ cat }}</button>
             {% endfor %}
             <div class="filter-count-label">Məhsullar: {{ products|length }}</div>
           </div>
@@ -79,9 +49,11 @@
         <section id="products-grid" class="products-grid">
           {% for product in products %}
             <div class="product-card" data-category="{{ product.category }}">
-              <img src="{{ product.image_url or url_for('static', filename='img/placeholder.svg') }}" alt="{{ product.name }}" class="product-img-placeholder">
+              <div class="product-img-wrapper">
+                <img src="{{ product.image_url or url_for('static', filename='img/placeholder.svg') }}" alt="{{ product.name }}" class="product-img-placeholder">
+              </div>
               <div class="product-name-text">{{ product.name }}</div>
-              <div class="product-category-text">Kateqoriya: {{ product.category }}</div>
+              <div class="product-category-pill">{{ product.category }}</div>
               <div class="product-info-row">
                 <div class="product-price-text">{{ "%.2f" | format(product.price) }} AZN</div>
                 <div class="product-stock-text">Stok: <span id="stock-{{ product.id }}">{{ product.stock }}</span></div>
@@ -91,7 +63,6 @@
                 <input type="number" min="1" value="1" class="qty-input" id="qty-{{ product.id }}" placeholder="Miqdar" title="Miqdar" aria-label="Miqdar for {{ product.name }}">
                 <button class="add-btn" type="button" data-id="{{ product.id }}" data-name="{{ product.name }}" data-price="{{ product.price }}" onclick="addToCart(this)">Seç</button>
               </div>
-
             </div>
           {% endfor %}
         </section>
@@ -123,9 +94,33 @@
         });
         // highlight active button
         document.querySelectorAll('.filters-flex .btn').forEach(b => b.classList.remove('filter-active'));
-        const buttons = Array.from(document.querySelectorAll('.filters-flex .btn'));
-        const active = buttons.find(b => (cat === 'All' && b.textContent.trim() === 'Bütün məhsullar') || b.textContent.trim() === String(cat));
+        const buttons = Array.from(document.querySelectorAll('.filters-flex .filter-btn'));
+        const active = buttons.find(b => b.dataset.category === cat);
         if (active) active.classList.add('filter-active');
+
+        updateVisibleCount();
+      }
+
+      function updateCategoryCounts() {
+        const cards = Array.from(document.querySelectorAll('.products-grid .product-card'));
+        const counts = { All: cards.length };
+        cards.forEach(card => {
+          const cat = card.dataset.category || 'Other';
+          counts[cat] = (counts[cat] || 0) + 1;
+        });
+        document.querySelectorAll('.filters-flex .filter-btn').forEach(button => {
+          const base = button.dataset.base || button.dataset.category;
+          const count = counts[button.dataset.category] || 0;
+          button.textContent = `${base} (${count})`;
+        });
+      }
+
+      function updateVisibleCount() {
+        const visible = Array.from(document.querySelectorAll('.products-grid .product-card')).filter(card => card.style.display !== 'none').length;
+        const countLabel = document.querySelector('.filter-count-label');
+        if (countLabel) {
+          countLabel.textContent = `Məhsullar: ${visible}`;
+        }
       }
 
       function addToCart(button) {

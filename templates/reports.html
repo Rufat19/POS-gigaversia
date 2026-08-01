@@ -7,52 +7,59 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
     <!-- Chart.js CDN -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <style>
-      .reports-top { display:flex; gap:12px; align-items:center; margin-bottom:12px }
-      .report-cards { display:flex; gap:12px; margin-bottom:18px }
-      .report-card { background:#fff;padding:12px;border-radius:8px;box-shadow:0 1px 4px rgba(0,0,0,0.03);min-width:240px }
-    </style>
   </head>
   <body>
-    <header style="display:flex;align-items:center;gap:12px;padding:12px;background:#fff;box-shadow:0 1px 4px rgba(0,0,0,0.03)">
-      <a href="/">POS</a>
-      <h2>Hesabatlar</h2>
-      <div style="margin-left:auto"><a href="/operations">Əməliyyatlar</a> | <a href="/">Məhsullar</a></div>
-    </header>
+    <div class="page-header">
+      <div class="page-title">
+        <h1>Hesabatlar</h1>
+        <p class="page-subtitle">Satış məlumatlarını tarix aralığına görə analiz et</p>
+      </div>
+      <nav class="page-nav">
+        <a href="/">Məhsullar</a>
+        <a href="/operations">Əməliyyatlar</a>
+        <a href="/reports" class="active">Hesabatlar</a>
+      </nav>
+    </div>
 
-    <div style="max-width:1100px;margin:18px auto;padding:12px">
+    <div class="container reports-container">
       <div class="reports-top">
-        <label>Başlanğıc tarix: <input type="date" id="start-date" value="{{ default_start }}"></label>
-        <label>Son tarix: <input type="date" id="end-date" value="{{ default_end }}"></label>
-        <button id="filter-btn" class="btn">Filtrlə</button>
+        <label class="date-filter">
+          Başlanğıc tarix
+          <input type="date" id="start-date" value="{{ default_start }}">
+        </label>
+        <label class="date-filter">
+          Son tarix
+          <input type="date" id="end-date" value="{{ default_end }}">
+        </label>
+        <button id="filter-btn" class="btn primary">Filtrlə</button>
       </div>
 
       <div class="report-cards">
         <div class="report-card">
           <h4>Ən çox satılan məhsul</h4>
-          <div id="most-sold">-</div>
+          <div id="most-sold" class="report-value">-</div>
         </div>
         <div class="report-card">
           <h4>Ən az satılan məhsul</h4>
-          <div id="least-sold">-</div>
+          <div id="least-sold" class="report-value">-</div>
         </div>
       </div>
 
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
-        <div style="background:#fff;padding:12px;border-radius:8px;box-shadow:0 1px 4px rgba(0,0,0,0.03)">
+      <div class="chart-grid">
+        <section class="chart-card">
           <h4>Kateqoriya üzrə satış payı</h4>
           <canvas id="pieChart"></canvas>
-        </div>
-        <div style="background:#fff;padding:12px;border-radius:8px;box-shadow:0 1px 4px rgba(0,0,0,0.03)">
+        </section>
+        <section class="chart-card">
           <h4>Gün üzrə ümumi satış (AZN)</h4>
           <canvas id="barDaily"></canvas>
-        </div>
+        </section>
       </div>
 
-      <div style="margin-top:16px;background:#fff;padding:12px;border-radius:8px;box-shadow:0 1px 4px rgba(0,0,0,0.03)">
+      <section class="chart-card chart-fullwidth">
         <h4>Top 5 ən çox satılan məhsul (ədəd)</h4>
         <canvas id="barTop5"></canvas>
-      </div>
+      </section>
     </div>
 
     <script>
