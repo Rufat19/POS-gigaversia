@@ -4,117 +4,41 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>POS - Məhsul siyahısı</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
     <style>
-      :root{--bg:#f6f3f0;--card:#ffffff;--accent:#ff7b2d;--muted:#7a7a7a}
-      *{box-sizing:border-box}
-      body{font-family:Inter, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial; margin:0;background:var(--bg);color:#222}
-      .container{max-width:1200px;margin:28px auto;padding:20px}
-      .header{display:flex;align-items:center;gap:12px;margin-bottom:18px}
-      .logo{font-weight:800;font-size:22px;color:#333}
-      .sub{color:var(--muted);font-size:13px}
-      .page{display:flex;gap:20px}
-      main{flex:1}
-      aside{width:360px}
-      .filters{display:flex;gap:8px;flex-wrap:wrap}
-      .btn{background:#fff;border:1px solid #eee;padding:8px 12px;border-radius:8px;cursor:pointer}
-      .btn.primary{background:var(--accent);color:#fff;border:none}
-      .products-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:16px}
-      .card{background:var(--card);border-radius:10px;padding:12px;box-shadow:0 6px 20px rgba(24,24,24,0.04);display:flex;flex-direction:column}
-      .thumb{height:110px;border-radius:8px;background:linear-gradient(180deg,#fdebd8,#f7e6de);display:flex;align-items:center;justify-content:center;color:#c88;margin-bottom:10px;font-weight:700}
-      .title{font-weight:700;margin-bottom:4px}
-      .meta{font-size:13px;color:var(--muted);margin-bottom:8px}
-      .row{display:flex;justify-content:space-between;align-items:center}
-      .qty-input{width:72px;padding:8px;border-radius:8px;border:1px solid #eee}
-      .card .actions{display:flex;gap:8px;margin-top:10px}
-      .cart-box{background:var(--card);padding:18px;border-radius:10px;box-shadow:0 6px 24px rgba(24,24,24,0.05)}
-      .cart-list{max-height:420px;overflow:auto;margin-bottom:12px}
-      .cart-item{display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid #f1f1f1}
-      .cart-item .left{display:flex;gap:8px;align-items:center}
-      .cart-item .name{font-weight:600}
-      .cart-total{font-weight:800;font-size:18px;margin-top:8px}
-      .checkout-msg{margin-top:10px;font-weight:700}
-      .layout-row{display:flex;gap:20px}
-      .filters-row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
-      .filter-count{margin-left:auto;font-size:14px;color:#666}
-      .products-grid-section{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:16px}
-      .product-card{border:1px solid #eee;padding:12px;border-radius:8px;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,0.03)}
-      .product-img{height:90px;background:#f7e6de;border-radius:6px;display:flex;align-items:center;justify-content:center;color:#c88;margin-bottom:8px}
-      .product-name{font-weight:600}
-      .product-category{font-size:13px;color:#666}
-      .product-info{margin-top:8px;display:flex;justify-content:space-between;align-items:center}
-      .product-price{font-weight:700;color:#d9534f}
-      .product-stock{font-size:13px;color:#666}
-      .product-actions{margin-top:8px;display:flex;gap:8px;align-items:center}
-      .qty-input{width:72px;padding:8px;border-radius:8px;border:1px solid #eee}
-      .add-btn{background:#ff7b2d;color:white;border:none;padding:8px 12px;border-radius:6px;cursor:pointer}
-      aside{width:340px;position:sticky;top:20px}
-      .cart-box-main{border-radius:8px;box-shadow:0 2px 8px rgba(0,0,0,0.06);padding:16px;background:#fff}
-      .cart-list{max-height:420px;overflow:auto;margin-bottom:12px}
-      .cart-item{display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid #f1f1f1}
-      .cart-item .left{display:flex;gap:8px;align-items:center}
-      .cart-item .name{font-weight:600}
-      .cart-total{font-weight:800;font-size:18px;margin-top:8px}
-      .cart-actions{margin-top:12px;display:flex;gap:8px}
-      .checkout-btn{background:#ff7b2d;color:white;border:none;padding:10px 14px;border-radius:6px;cursor:pointer}
-      .clear-btn{background:#f0f0f0;border:1px solid #eee;padding:10px 14px;border-radius:6px;cursor:pointer}
-      .checkout-message{margin-top:10px;color:green;font-weight:600}
-      main{flex:1}
-      .section-filters{margin-bottom:16px}
-      .filters-flex{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
-      .products-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:16px}
-      .product-card{border:1px solid #eee;padding:12px;border-radius:8px;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,0.03)}
-      .product-img{height:90px;background:#f7e6de;border-radius:6px;display:flex;align-items:center;justify-content:center;color:#c88;margin-bottom:8px}
-      .product-name{font-weight:600}
-      .product-meta{font-size:13px;color:#666}
-      .product-info{margin-top:8px;display:flex;justify-content:space-between;align-items:center}
-      .product-price{font-weight:700;color:#d9534f}
-      .product-actions{margin-top:8px;display:flex;gap:8px;align-items:center}
-      .product-actions .btn{background:#ff7b2d;color:white;border:none;padding:8px 12px;border-radius:6px}
-      .filters-section{margin-bottom:16px;display:flex;gap:8px;flex-wrap:wrap;align-items:center}
-      #products-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:16px}
-      .product-card-item{border:1px solid #eee;padding:12px;border-radius:8px;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,0.03)}
-      .product-img-placeholder{height:90px;background:#f7e6de;border-radius:6px;display:flex;align-items:center;justify-content:center;color:#c88;margin-bottom:8px}
-      .product-name-text{font-weight:600}
-      .product-category-text{font-size:13px;color:#666}
-      .product-info-row{margin-top:8px;display:flex;justify-content:space-between;align-items:center}
-      .product-price-text{font-weight:700;color:#d9534f}
-      .product-stock-text{font-size:13px;color:#666}
-      .product-actions-row{margin-top:8px;display:flex;gap:8px;align-items:center}
-      .filter-count-label{margin-left:auto;font-size:14px;color:#666}
-      .cart-items-container{margin-top:12px;display:flex;gap:8px}
-      .checkout-message-box{margin-top:10px;color:green;font-weight:600}
-      @media(max-width:900px){.page{flex-direction:column}aside{width:100%}.layout-row{flex-direction:column}aside{width:100%}}
+      .checkout-actions { margin-top:12px; display:flex; gap:8px; }
     </style>
+
   </head>
   <body>
     <h1>POS - Kiosk (Touch-friendly)</h1>
 
     <div class="layout-row">
-      <main style="flex:1">
-        <section style="margin-bottom:16px">
-          <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center">
+      <main>
+        <section class="section-filters">
+          <div class="filters-flex">
             <button class="btn" onclick="filterCategory('All')">Bütün məhsullar</button>
             {% for cat in categories %}
               <button class="btn" onclick="filterCategory('{{ cat }}')">{{ cat }}</button>
             {% endfor %}
-            <div style="margin-left:auto; font-size:14px; color:#666">Məhsullar: {{ products|length }}</div>
+            <div class="filter-count-label">Məhsullar: {{ products|length }}</div>
           </div>
         </section>
 
-        <section id="products-grid" style="display:grid; grid-template-columns: repeat(auto-fill,minmax(220px,1fr)); gap:16px">
+        <section id="products-grid">
           {% for product in products %}
-            <div class="card" data-category="{{ product.category }}" style="border:1px solid #eee; padding:12px; border-radius:8px; background:#fff; box-shadow:0 1px 3px rgba(0,0,0,0.03)">
-              <div style="height:90px; background:#f7e6de; border-radius:6px; display:flex; align-items:center; justify-content:center; color:#c88; margin-bottom:8px">ŞƏKİL YAXIN GÖRÜNƏCƏK</div>
-              <div style="font-weight:600">{{ product.name }}</div>
-              <div style="font-size:13px; color:#666">Kateqoriya: {{ product.category }}</div>
-              <div style="margin-top:8px; display:flex; justify-content:space-between; align-items:center">
-                <div style="font-weight:700; color:#d9534f">{{ "%.2f" | format(product.price) }} AZN</div>
-                <div style="font-size:13px; color:#666">Stok: <span id="stock-{{ product.id }}">{{ product.stock }}</span></div>
+            <div class="product-card" data-category="{{ product.category }}">
+              <div class="product-img-placeholder">ŞƏKİL YAXIN GÖRÜNƏCƏK</div>
+              <div class="product-name-text">{{ product.name }}</div>
+              <div class="product-category-text">Kateqoriya: {{ product.category }}</div>
+              <div class="product-info-row">
+                <div class="product-price-text">{{ "%.2f" | format(product.price) }} AZN</div>
+                <div class="product-stock-text">Stok: <span id="stock-{{ product.id }}">{{ product.stock }}</span></div>
               </div>
 
-              <div style="margin-top:8px; display:flex; gap:8px; align-items:center">
+              <div class="product-actions-row">
                 <input type="number" min="1" value="1" class="qty-input" id="qty-{{ product.id }}" placeholder="Miqdar" title="Miqdar" aria-label="Miqdar for {{ product.name }}">
-                <button class="btn" style="background:#ff7b2d; color:white; border:none; padding:8px 12px; border-radius:6px" type="button" data-id="{{ product.id }}" data-name="{{ product.name }}" data-price="{{ product.price }}" onclick="addToCart(this)">Seç</button>
+                <button class="add-btn" type="button" data-id="{{ product.id }}" data-name="{{ product.name }}" data-price="{{ product.price }}" onclick="addToCart(this)">Seç</button>
               </div>
 
             </div>
@@ -122,16 +46,16 @@
         </section>
       </main>
 
-      <aside style="width:340px; position:sticky; top:20px">
-        <div class="cart-box" style="border-radius:8px; box-shadow:0 2px 8px rgba(0,0,0,0.06); padding:16px; background:#fff">
-          <h2 style="margin-top:0">Səbət</h2>
+      <aside>
+        <div class="cart-box-main">
+          <h2 class="cart-title">Səbət</h2>
           <div id="cart-items">Səbət hələ boşdur.</div>
           <div class="total" id="cart-total">Ümumi məbləğ: 0.00 AZN</div>
-          <div style="margin-top:12px; display:flex; gap:8px">
-            <button class="btn" type="button" onclick="checkout()" style="background:#ff7b2d; color:white; border:none; padding:10px 14px; border-radius:6px">Satışı təsdiqlə</button>
-            <button class="btn" type="button" onclick="cart.length=0; renderCart();" style="background:#f0f0f0;">Təmizlə</button>
+          <div class="checkout-actions">
+            <button class="checkout-btn" type="button" onclick="checkout()">Satışı təsdiqlə</button>
+            <button class="clear-btn" type="button" onclick="cart.length=0; renderCart();">Təmizlə</button>
           </div>
-          <div id="checkout-message" style="margin-top:10px;color:green;font-weight:600"></div>
+          <div id="checkout-message" class="checkout-message"></div>
         </div>
       </aside>
     </div>
