@@ -55,17 +55,17 @@
           </div>
 
           <!-- Add product form (open for adding new items) -->
-          <div style="margin-top:12px; padding:12px; background:#fff; border-radius:8px; box-shadow:0 1px 4px rgba(0,0,0,0.03)">
-            <h3 style="margin:0 0 8px 0">Yeni məhsul əlavə et</h3>
-            <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
-              <input id="new-name" placeholder="Məhsul adı" style="padding:8px;border-radius:6px;border:1px solid #eee;flex:1">
-              <input id="new-category" placeholder="Kateqoriya" value="Other" style="padding:8px;border-radius:6px;border:1px solid #eee;width:160px">
-              <input id="new-price" placeholder="Qiymət" type="number" step="0.01" style="padding:8px;border-radius:6px;border:1px solid #eee;width:120px">
-              <input id="new-stock" placeholder="Stok" type="number" value="10" style="padding:8px;border-radius:6px;border:1px solid #eee;width:100px">
-              <input id="new-image" placeholder="Image URL (optional)" style="padding:8px;border-radius:6px;border:1px solid #eee;width:220px">
-              <button class="btn" type="button" onclick="addProduct()" style="background:#28a745;color:#fff;border:none;padding:8px 12px;border-radius:6px">Əlavə et</button>
+          <div class="new-product-form-container">
+            <h3>Yeni məhsul əlavə et</h3>
+            <div class="new-product-form-inputs">
+              <input id="new-name" placeholder="Məhsul adı" class="new-product-input">
+              <input id="new-category" placeholder="Kateqoriya" value="Other" class="new-product-input short">
+              <input id="new-price" placeholder="Qiymət" type="number" step="0.01" class="new-product-input small">
+              <input id="new-stock" placeholder="Stok" type="number" value="10" class="new-product-input xsmall">
+              <input id="new-image" placeholder="Image URL (optional)" class="new-product-input long">
+              <button class="add-btn" type="button" onclick="addProduct()">Əlavə et</button>
             </div>
-            <div id="add-product-msg" style="margin-top:8px;font-size:13px;color:#666"></div>
+            <div id="add-product-msg" class="add-product-msg"></div>
           </div>
         </section>
 
@@ -109,15 +109,16 @@
       const cart = [];
 
       function filterCategory(cat) {
-        const cards = document.querySelectorAll('.products-grid .card');
+        const cards = document.querySelectorAll('.products-grid .product-card');
         cards.forEach(c => {
           if (cat === 'All' || c.dataset.category === cat) c.style.display = '';
           else c.style.display = 'none';
         });
-        // highlight active
-        document.querySelectorAll('.filters .btn').forEach(b => b.classList.remove('filter-active'));
-        const active = Array.from(document.querySelectorAll('.filters .btn')).find(b => b.textContent.trim()===cat || (cat==='All' && b.textContent.trim()==='Bütün məhsullar'));
-        if(active) active.classList.add('filter-active');
+        // highlight active button
+        document.querySelectorAll('.filters-flex .btn').forEach(b => b.classList.remove('filter-active'));
+        const buttons = Array.from(document.querySelectorAll('.filters-flex .btn'));
+        const active = buttons.find(b => (cat === 'All' && b.textContent.trim() === 'Bütün məhsullar') || b.textContent.trim() === String(cat));
+        if (active) active.classList.add('filter-active');
       }
 
       function addToCart(button) {

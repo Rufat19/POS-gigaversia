@@ -68,3 +68,16 @@ main{flex:1}
 .cart-items-container{margin-top:12px;display:flex;gap:8px}
 .checkout-message-box{margin-top:10px;color:green;font-weight:600}
 @media(max-width:900px){.page{flex-direction:column}aside{width:100%}.layout-row{flex-direction:column}aside{width:100%}}
+
+/* new-product form styles (moved from template inline) */
+.new-product-form-container{margin-top:12px;padding:12px;background:#fff;border-radius:8px;box-shadow:0 1px 4px rgba(0,0,0,0.03)}
+.new-product-form-container h3{margin:0 0 8px 0}
+.new-product-form-inputs{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.new-product-form-inputs .new-product-input{padding:8px;border-radius:6px;border:1px solid #eee}
+.new-product-form-inputs .new-product-input{min-width:80px}
+.new-product-form-inputs .new-product-input.short{width:160px}
+.new-product-form-inputs .new-product-input.small{width:120px}
+.new-product-form-inputs .new-product-input.xsmall{width:100px}
+.new-product-form-inputs .new-product-input.long{width:220px}
+.add-product-msg{margin-top:8px;font-size:13px;color:#666}
+@media(max-width:600px){.new-product-form-inputs{flex-direction:column}.new-product-form-inputs .new-product-input{width:100%}.new-product-form-inputs .add-btn{width:100%}}
