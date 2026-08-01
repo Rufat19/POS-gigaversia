@@ -18,60 +18,64 @@
     </style>
   </head>
   <body>
-    <h1>POS - Məhsul siyahısı</h1>
-    <table>
-      <thead>
-        <tr>
-          <th>ID</th>
-          <th>Ad</th>
-          <th>Qiymət</th>
-          <th>Stok</th>
-          <th>Miqdar</th>
-          <th>Əməliyyat</th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for product in products %}
-        <tr>
-          <td>{{ product.id }}</td>
-          <td>{{ product.name }}</td>
-          <td>{{ "%.2f" | format(product.price) }}</td>
-          <td id="stock-{{ product.id }}">{{ product.stock }}</td>
-          <td>
-            <input type="number" min="1" value="1" class="qty-input" id="qty-{{ product.id }}">
-          </td>
-          <td>
-            <button
-              class="btn"
-              type="button"
-              data-id="{{ product.id }}"
-              data-name="{{ product.name }}"
-              data-price="{{ product.price }}"
-              onclick="addToCart(this)"
-            >
-              Səbətə əlavə et
-            </button>
-          </td>
-        </tr>
-        {% else %}
-        <tr>
-          <td colspan="6">Hal-hazırda məhsul yoxdur.</td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
+    <h1>POS - Kiosk (Touch-friendly)</h1>
 
-    <div class="cart-box">
-      <h2>Səbət</h2>
-      <div id="cart-items">Səbət hələ boşdur.</div>
-      <div class="total" id="cart-total">Ümumi məbləğ: 0.00 AZN</div>
-      <br>
-      <button class="btn" type="button" onclick="checkout()">Satışı təsdiqlə</button>
-      <div id="checkout-message" style="margin-top: 10px;"></div>
+    <div style="display:flex; gap:20px; align-items:flex-start">
+      <main style="flex:1">
+        <section style="margin-bottom:16px">
+          <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center">
+            <button class="btn" onclick="filterCategory('All')">Bütün məhsullar</button>
+            {% for cat in categories %}
+              <button class="btn" onclick="filterCategory('{{ cat }}')">{{ cat }}</button>
+            {% endfor %}
+            <div style="margin-left:auto; font-size:14px; color:#666">Məhsullar: {{ products|length }}</div>
+          </div>
+        </section>
+
+        <section id="products-grid" style="display:grid; grid-template-columns: repeat(auto-fill,minmax(220px,1fr)); gap:16px">
+          {% for product in products %}
+            <div class="card" data-category="{{ product.category }}" style="border:1px solid #eee; padding:12px; border-radius:8px; background:#fff; box-shadow:0 1px 3px rgba(0,0,0,0.03)">
+              <div style="height:90px; background:#f7e6de; border-radius:6px; display:flex; align-items:center; justify-content:center; color:#c88; margin-bottom:8px">ŞƏKİL YAXIN GÖRÜNƏCƏK</div>
+              <div style="font-weight:600">{{ product.name }}</div>
+              <div style="font-size:13px; color:#666">Kateqoriya: {{ product.category }}</div>
+              <div style="margin-top:8px; display:flex; justify-content:space-between; align-items:center">
+                <div style="font-weight:700; color:#d9534f">{{ "%.2f" | format(product.price) }} AZN</div>
+                <div style="font-size:13px; color:#666">Stok: <span id="stock-{{ product.id }}">{{ product.stock }}</span></div>
+              </div>
+
+              <div style="margin-top:8px; display:flex; gap:8px; align-items:center">
+                <input type="number" min="1" value="1" class="qty-input" id="qty-{{ product.id }}" style="width:72px; padding:8px; border-radius:6px; border:1px solid #ddd">
+                <button class="btn" style="background:#ff7b2d; color:white; border:none; padding:8px 12px; border-radius:6px" type="button" data-id="{{ product.id }}" data-name="{{ product.name }}" data-price="{{ product.price }}" onclick="addToCart(this)">Seç</button>
+              </div>
+
+            </div>
+          {% endfor %}
+        </section>
+      </main>
+
+      <aside style="width:340px; position:sticky; top:20px">
+        <div class="cart-box" style="border-radius:8px; box-shadow:0 2px 8px rgba(0,0,0,0.06); padding:16px; background:#fff">
+          <h2 style="margin-top:0">Səbət</h2>
+          <div id="cart-items">Səbət hələ boşdur.</div>
+          <div class="total" id="cart-total">Ümumi məbləğ: 0.00 AZN</div>
+          <div style="margin-top:12px; display:flex; gap:8px">
+            <button class="btn" type="button" onclick="checkout()" style="background:#ff7b2d; color:white; border:none; padding:10px 14px; border-radius:6px">Satışı təsdiqlə</button>
+            <button class="btn" type="button" onclick="cart.length=0; renderCart();" style="background:#f0f0f0;">Təmizlə</button>
+          </div>
+          <div id="checkout-message" style="margin-top:10px;color:green;font-weight:600"></div>
+        </div>
+      </aside>
     </div>
 
     <script>
       const cart = [];
+      function filterCategory(cat) {
+        const cards = document.querySelectorAll('#products-grid .card');
+        cards.forEach(c => {
+          if (cat === 'All' || c.dataset.category === cat) c.style.display = '';
+          else c.style.display = 'none';
+        });
+      }
 
       function addToCart(button) {
         const id = Number(button.dataset.id);

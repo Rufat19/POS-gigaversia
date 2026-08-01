@@ -49,12 +49,18 @@ def init_db():
                 """
                 CREATE TABLE IF NOT EXISTS products (
                     id SERIAL PRIMARY KEY,
-                    name VARCHAR(100) NOT NULL,
+                    name VARCHAR(200) NOT NULL,
+                    category VARCHAR(50) DEFAULT 'Other',
                     price NUMERIC(10,2) NOT NULL,
                     stock INT NOT NULL DEFAULT 0
                 )
                 """
             )
+            # Ensure category column exists (for older DBs)
+            try:
+                cur.execute("ALTER TABLE products ADD COLUMN IF NOT EXISTS category VARCHAR(50) DEFAULT 'Other'")
+            except Exception:
+                pass
             cur.execute(
                 """
                 CREATE TABLE IF NOT EXISTS sales (
@@ -87,11 +93,19 @@ def init_db():
             CREATE TABLE IF NOT EXISTS products (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 name TEXT NOT NULL,
+                category TEXT DEFAULT 'Other',
                 price REAL NOT NULL,
                 stock INTEGER NOT NULL DEFAULT 0
             )
             """
         )
+        # Add category column if missing (SQLite)
+        cols = [row[1] for row in conn.execute("PRAGMA table_info('products')").fetchall()]
+        if 'category' not in cols:
+            try:
+                conn.execute("ALTER TABLE products ADD COLUMN category TEXT DEFAULT 'Other'")
+            except Exception:
+                pass
         conn.execute(
             """
             CREATE TABLE IF NOT EXISTS sales (
@@ -129,11 +143,14 @@ def products_page():
     database_url, _ = get_db_config()
     if database_url:
         with conn.cursor() as cur:
-            cur.execute("SELECT id, name, price, stock FROM products ORDER BY id")
+            cur.execute("SELECT id, name, category, price, stock FROM products ORDER BY id")
             products = cur.fetchall()
+            cur.execute("SELECT DISTINCT category FROM products ORDER BY category")
+            categories = [r['category'] for r in cur.fetchall()]
     else:
-        products = conn.execute("SELECT id, name, price, stock FROM products ORDER BY id").fetchall()
-    return render_template("products.html", products=products)
+        products = conn.execute("SELECT id, name, category, price, stock FROM products ORDER BY id").fetchall()
+        categories = [r[0] for r in conn.execute("SELECT DISTINCT category FROM products ORDER BY category").fetchall()]
+    return render_template("products.html", products=products, categories=categories)
 
 
 @app.route("/checkout", methods=["POST"])
