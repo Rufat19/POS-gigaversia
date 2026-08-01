@@ -80,11 +80,12 @@ def _create_tables_postgres(conn):
                 name VARCHAR(200) NOT NULL,
                 category VARCHAR(50) DEFAULT 'Other',
                 price NUMERIC(10,2) NOT NULL,
-                stock INT NOT NULL DEFAULT 0
+                stock INT NOT NULL DEFAULT 0,
+                image_url TEXT
             )
             """
         )
-        # Ensure category column exists (for older DBs)
+        # Ensure category and image_url columns exist (for older DBs)
         try:
             alter_sql = (
                 "ALTER TABLE products ADD COLUMN IF NOT EXISTS category "
@@ -93,6 +94,12 @@ def _create_tables_postgres(conn):
             cur.execute(alter_sql)
         except (psycopg2.Error, sqlite3.Error):
             # If ALTER fails (older Postgres/permissions), ignore and continue
+            pass
+        try:
+            cur.execute(
+                "ALTER TABLE products ADD COLUMN IF NOT EXISTS image_url TEXT"
+            )
+        except (psycopg2.Error, sqlite3.Error):
             pass
 
         cur.execute(
@@ -130,16 +137,16 @@ def _create_tables_postgres(conn):
                 pg_count = 0
         if pg_count == 0:
             cur.execute(
-                "INSERT INTO products (name, price, stock) VALUES (%s, %s, %s)",
-                ("Kofe", 12.50, 20),
+                "INSERT INTO products (name, price, stock, image_url) VALUES (%s, %s, %s, %s)",
+                ("Kofe", 12.50, 20, None),
             )
             cur.execute(
-                "INSERT INTO products (name, price, stock) VALUES (%s, %s, %s)",
-                ("Su", 2.50, 100),
+                "INSERT INTO products (name, price, stock, image_url) VALUES (%s, %s, %s, %s)",
+                ("Su", 2.50, 100, None),
             )
             cur.execute(
-                "INSERT INTO products (name, price, stock) VALUES (%s, %s, %s)",
-                ("Çörək", 4.00, 50),
+                "INSERT INTO products (name, price, stock, image_url) VALUES (%s, %s, %s, %s)",
+                ("Çörək", 4.00, 50, None),
             )
         conn.commit()
     finally:
@@ -161,11 +168,12 @@ def _create_tables_sqlite(conn):
                 name TEXT NOT NULL,
                 category TEXT DEFAULT 'Other',
                 price REAL NOT NULL,
-                stock INTEGER NOT NULL DEFAULT 0
+                stock INTEGER NOT NULL DEFAULT 0,
+                image_url TEXT
             )
             """
         )
-        # Add category column if missing (SQLite)
+        # Add category/image_url column if missing (SQLite)
         cur.execute("PRAGMA table_info('products')")
         cols = [row[1] for row in cur.fetchall()]
         if 'category' not in cols:
@@ -173,6 +181,11 @@ def _create_tables_sqlite(conn):
                 alter_sql = ("ALTER TABLE products ADD COLUMN category TEXT "
                              "DEFAULT 'Other'")
                 cur.execute(alter_sql)
+            except sqlite3.Error:
+                pass
+        if 'image_url' not in cols:
+            try:
+                cur.execute("ALTER TABLE products ADD COLUMN image_url TEXT")
             except sqlite3.Error:
                 pass
 
@@ -214,16 +227,16 @@ def _create_tables_sqlite(conn):
                 existing_count = 0
         if existing_count == 0:
             cur.execute(
-                "INSERT INTO products (name, price, stock) VALUES (?, ?, ?)",
-                ("Kofe", 12.50, 20),
+                "INSERT INTO products (name, price, stock, image_url) VALUES (?, ?, ?, ?)",
+                ("Kofe", 12.50, 20, None),
             )
             cur.execute(
-                "INSERT INTO products (name, price, stock) VALUES (?, ?, ?)",
-                ("Su", 2.50, 100),
+                "INSERT INTO products (name, price, stock, image_url) VALUES (?, ?, ?, ?)",
+                ("Su", 2.50, 100, None),
             )
             cur.execute(
-                "INSERT INTO products (name, price, stock) VALUES (?, ?, ?)",
-                ("Çörək", 4.00, 50),
+                "INSERT INTO products (name, price, stock, image_url) VALUES (?, ?, ?, ?)",
+                ("Çörək", 4.00, 50, None),
             )
         conn.commit()
     finally:
@@ -301,11 +314,11 @@ def checkout():
 
     try:
         if database_url:
-            _checkout_postgres(conn, cart)
+            sale_id, total = _checkout_postgres(conn, cart)
         else:
-            _checkout_sqlite(conn, cart)
+            sale_id, total = _checkout_sqlite(conn, cart)
 
-        return jsonify({"success": True, "message": "Satış tamamlandı!"})
+        return jsonify({"success": True, "message": "Satış tamamlandı!", "sale_id": sale_id, "total": total})
     except ValueError as exc:
         conn.rollback()
         return jsonify({"success": False, "message": str(exc)}), 400
@@ -368,6 +381,7 @@ def _checkout_postgres(conn, cart):
             cur.execute(update_stock_sql, (quantity, product_id))
 
         conn.commit()
+        return sale_id, round(total_amount, 2)
     finally:
         cur.close()
 
@@ -417,6 +431,62 @@ def _checkout_sqlite(conn, cart):
         conn.execute("UPDATE products SET stock = stock - ? WHERE id = ?", (quantity, product_id))
 
     conn.commit()
+    return sale_id, round(total_amount, 2)
+
+
+@app.route('/add_product', methods=['POST'])
+def add_product():
+    """API endpoint to add a new product.
+
+    Accepts JSON: {name, category, price, stock, image_url} and inserts a new
+    product row, returning the created product id.
+    """
+    data = request.get_json(silent=True) or {}
+    name = data.get('name')
+    category = data.get('category', 'Other')
+    try:
+        price = float(data.get('price', 0))
+    except (TypeError, ValueError):
+        return jsonify({'success': False, 'message': 'Invalid price'}), 400
+    try:
+        stock = int(data.get('stock', 0))
+    except (TypeError, ValueError):
+        return jsonify({'success': False, 'message': 'Invalid stock'}), 400
+    image_url = data.get('image_url')
+
+    conn = get_db()
+    database_url, _ = get_db_config()
+    if database_url:
+        cur = conn.cursor()
+        try:
+            cur.execute(
+                "INSERT INTO products (name, category, price, stock, image_url) VALUES (%s, %s, %s, %s, %s) RETURNING id",
+                (name, category, price, stock, image_url),
+            )
+            row = cur.fetchone()
+            conn.commit()
+            new_id = row['id'] if row and not isinstance(row, tuple) and hasattr(row, 'get') else (row[0] if row else None)
+            return jsonify({'success': True, 'id': new_id})
+        except Exception as exc:  # pylint: disable=broad-except
+            conn.rollback()
+            return jsonify({'success': False, 'message': str(exc)}), 500
+        finally:
+            cur.close()
+    else:
+        cur = conn.cursor()
+        try:
+            cur.execute(
+                "INSERT INTO products (name, category, price, stock, image_url) VALUES (?, ?, ?, ?, ?)",
+                (name, category, price, stock, image_url),
+            )
+            new_id = cur.lastrowid
+            conn.commit()
+            return jsonify({'success': True, 'id': new_id})
+        except Exception as exc:  # pylint: disable=broad-except
+            conn.rollback()
+            return jsonify({'success': False, 'message': str(exc)}), 500
+        finally:
+            cur.close()
 
 
 if __name__ == "__main__":

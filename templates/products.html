@@ -7,6 +7,36 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
     <style>
       .checkout-actions { margin-top:12px; display:flex; gap:8px; }
+      .add-product-form { margin-top:12px; padding:12px; background:#fff; border-radius:8px; box-shadow:0 1px 4px rgba(0,0,0,0.03); }
+      .add-product-form h3 { margin:0 0 8px 0; }
+      .add-product-inputs { display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
+      .add-product-inputs input { padding:8px; border-radius:6px; border:1px solid #eee; }
+      .add-product-inputs input:nth-child(1) { flex:1; }
+      .add-product-inputs input:nth-child(2) { width:160px; }
+      .add-product-inputs input:nth-child(3) { width:120px; }
+      .add-product-inputs input:nth-child(4) { width:100px; }
+      .add-product-inputs input:nth-child(5) { width:220px; }
+      .add-product-btn { background:#28a745; color:#fff; border:none; padding:8px 12px; border-radius:6px; }
+      .add-product-msg { margin-top:8px; font-size:13px; color:#666; }
+      .add-product-section { margin-top:12px; padding:12px; background:#fff; border-radius:8px; box-shadow:0 1px 4px rgba(0,0,0,0.03); }
+      .add-product-section h3 { margin:0 0 8px 0; }
+      .add-product-section-flex { display:flex;gap:8px;flex-wrap:wrap;align-items:center; }
+      .add-product-section-flex input { padding:8px;border-radius:6px;border:1px solid #eee; }
+      .add-product-section-flex input:nth-child(1) { flex:1; }
+      .add-product-section-flex input:nth-child(2) { width:160px; }
+      .add-product-section-flex input:nth-child(3) { width:120px; }
+      .add-product-section-flex input:nth-child(4) { width:100px; }
+      .add-product-section-flex input:nth-child(5) { width:220px; }
+      #add-product-msg { margin-top:8px;font-size:13px;color:#666; }
+      .new-product-form-container { margin-top:12px; padding:12px; background:#fff; border-radius:8px; box-shadow:0 1px 4px rgba(0,0,0,0.03); }
+      .new-product-form-container h3 { margin:0 0 8px 0; }
+      .new-product-form-inputs { display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
+      .new-product-form-inputs input { padding:8px; border-radius:6px; border:1px solid #eee; }
+      .new-product-form-inputs input:nth-child(1) { flex:1; }
+      .new-product-form-inputs input:nth-child(2) { width:160px; }
+      .new-product-form-inputs input:nth-child(3) { width:120px; }
+      .new-product-form-inputs input:nth-child(4) { width:100px; }
+      .new-product-form-inputs input:nth-child(5) { width:220px; }
     </style>
 
   </head>
@@ -23,12 +53,26 @@
             {% endfor %}
             <div class="filter-count-label">Məhsullar: {{ products|length }}</div>
           </div>
+
+          <!-- Add product form (open for adding new items) -->
+          <div style="margin-top:12px; padding:12px; background:#fff; border-radius:8px; box-shadow:0 1px 4px rgba(0,0,0,0.03)">
+            <h3 style="margin:0 0 8px 0">Yeni məhsul əlavə et</h3>
+            <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+              <input id="new-name" placeholder="Məhsul adı" style="padding:8px;border-radius:6px;border:1px solid #eee;flex:1">
+              <input id="new-category" placeholder="Kateqoriya" value="Other" style="padding:8px;border-radius:6px;border:1px solid #eee;width:160px">
+              <input id="new-price" placeholder="Qiymət" type="number" step="0.01" style="padding:8px;border-radius:6px;border:1px solid #eee;width:120px">
+              <input id="new-stock" placeholder="Stok" type="number" value="10" style="padding:8px;border-radius:6px;border:1px solid #eee;width:100px">
+              <input id="new-image" placeholder="Image URL (optional)" style="padding:8px;border-radius:6px;border:1px solid #eee;width:220px">
+              <button class="btn" type="button" onclick="addProduct()" style="background:#28a745;color:#fff;border:none;padding:8px 12px;border-radius:6px">Əlavə et</button>
+            </div>
+            <div id="add-product-msg" style="margin-top:8px;font-size:13px;color:#666"></div>
+          </div>
         </section>
 
         <section id="products-grid" class="products-grid">
           {% for product in products %}
             <div class="product-card" data-category="{{ product.category }}">
-              <div class="product-img-placeholder">ŞƏKİL YAXIN GÖRÜNƏCƏK</div>
+              <img src="{{ product.image_url or url_for('static', filename='img/placeholder.svg') }}" alt="{{ product.name }}" class="product-img-placeholder">
               <div class="product-name-text">{{ product.name }}</div>
               <div class="product-category-text">Kateqoriya: {{ product.category }}</div>
               <div class="product-info-row">
@@ -90,10 +134,30 @@
         const existing = cart.find(item => item.id === id);
         const alreadyInCart = existing ? existing.quantity : 0;
         if (available !== null && (quantity + alreadyInCart) > available) { alert('Seçilən miqdar mövcud stokdan çoxdur.'); return; }
+ 
+       if (existing) existing.quantity += quantity; else cart.push({ id, name, price, quantity });
+       renderCart();
+        }
 
-        if (existing) existing.quantity += quantity; else cart.push({ id, name, price, quantity });
-        renderCart();
-      }
+        // Add product via API
+        async function addProduct(){
+       const name = document.getElementById('new-name').value.trim();
+       const category = document.getElementById('new-category').value.trim() || 'Other';
+       const price = document.getElementById('new-price').value.trim();
+       const stock = document.getElementById('new-stock').value.trim();
+       const image_url = document.getElementById('new-image').value.trim();
+       const msg = document.getElementById('add-product-msg');
+       if(!name || !price){ msg.textContent='Zəhmət olmasa ad və qiymət daxil edin.'; return; }
+       msg.textContent='Məhsul əlavə edilir...';
+       try{
+         const res = await fetch('/add_product',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name,category,price,stock,image_url})});
+         const data = await res.json();
+         if(!res.ok) throw new Error(data.message||'Xəta');
+         msg.textContent='Məhsul əlavə edildi.';
+         // reload to show new product in grid (simpler than DOM insertion)
+         setTimeout(()=>location.reload(),700);
+       }catch(e){ msg.textContent='Əlavə zamanı xəta: '+e.message; }
+        }
 
       function removeFromCart(index) { cart.splice(index,1); renderCart(); }
 
@@ -129,9 +193,39 @@
           const response = await fetch('/checkout',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({cart})});
           const result = await response.json(); if(!response.ok) throw new Error(result.message||'Satış uğursuz oldu.');
           messageBox.textContent = result.message || 'Satış tamamlandı!';
+          // update stocks locally
           cart.forEach(item=>{ const stockEl=document.getElementById('stock-'+item.id); if(stockEl){ const current=Number(stockEl.textContent||0); stockEl.textContent=Math.max(0,current-item.quantity); } });
+          // print receipt
+          try{ printReceipt(result, cart); }catch(e){ console.error('Print error',e); }
           cart.length=0; renderCart();
         }catch(err){ messageBox.textContent=err.message; }
+      }
+
+      // print receipt helper
+      function printReceipt(result, cartSnapshot){
+        const w = window.open('','_blank','width=600,height=800');
+        const total = result.total || 0;
+        const saleId = result.sale_id || '';
+        const now = new Date().toLocaleString();
+        const itemsHtml = cartSnapshot.map(i=>`<tr><td>${i.name}</td><td style="text-align:right">${i.quantity}</td><td style="text-align:right">${i.price.toFixed(2)}</td><td style="text-align:right">${(i.price*i.quantity).toFixed(2)}</td></tr>`).join('');
+        const html = `
+          <html><head><title>Qəbz</title>
+          <style>body{font-family:Arial,Helvetica,sans-serif;padding:20px}table{width:100%;border-collapse:collapse}td,th{padding:6px;border-bottom:1px solid #ddd}</style>
+          </head><body>
+          <h2>Satış Qəbzi</h2>
+          <div>Satış nömrəsi: ${saleId}</div>
+          <div>Zaman: ${now}</div>
+          <table>
+            <thead><tr><th>Məhsul</th><th style="text-align:right">Miqdar</th><th style="text-align:right">Vahid</th><th style="text-align:right">Cəmi</th></tr></thead>
+            <tbody>${itemsHtml}</tbody>
+          </table>
+          <h3>Ümumi: ${Number(total).toFixed(2)} AZN</h3>
+          <div style="margin-top:20px">Təşəkkür edirik!</div>
+          <script>setTimeout(function(){ window.print(); }, 300);<\/script>
+          </body></html>
+        `;
+        w.document.write(html);
+        w.document.close();
       }
 
       // init default filter
