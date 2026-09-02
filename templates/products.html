@@ -13,11 +13,19 @@
         <h1>POS Kiosk</h1>
         <p class="page-subtitle">Müştəri sifarişləri üçün professional POS təcrübəsi</p>
       </div>
-      <nav class="page-nav">
-        <a href="/" class="active">Məhsullar</a>
-        <a href="/operations">Əməliyyatlar</a>
-        <a href="/reports">Hesabatlar</a>
-      </nav>
+      <div class="page-actions">
+        <nav class="page-nav">
+          <a href="/" class="active">Məhsullar</a>
+          {% if session.get('role') == 'manager' %}
+            <a href="/operations">Əməliyyatlar</a>
+            <a href="/reports">Hesabatlar</a>
+          {% endif %}
+        </nav>
+        <div class="user-chip">
+          {{ 'Müdir' if session.get('role') == 'manager' else 'Satıcı' }}
+          <a href="{{ url_for('logout') }}" class="logout-link">Çıxış</a>
+        </div>
+      </div>
     </div>
 
     <div class="layout-row">

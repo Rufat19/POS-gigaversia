@@ -14,11 +14,17 @@
         <h1>Hesabatlar</h1>
         <p class="page-subtitle">Satış məlumatlarını tarix aralığına görə analiz et</p>
       </div>
-      <nav class="page-nav">
-        <a href="/">Məhsullar</a>
-        <a href="/operations">Əməliyyatlar</a>
-        <a href="/reports" class="active">Hesabatlar</a>
-      </nav>
+      <div class="page-actions">
+        <nav class="page-nav">
+          <a href="/">Məhsullar</a>
+          <a href="/operations">Əməliyyatlar</a>
+          <a href="/reports" class="active">Hesabatlar</a>
+        </nav>
+        <div class="user-chip">
+          Müdir
+          <a href="{{ url_for('logout') }}" class="logout-link">Çıxış</a>
+        </div>
+      </div>
     </div>
 
     <div class="container reports-container">

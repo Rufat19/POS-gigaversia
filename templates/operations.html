@@ -12,11 +12,17 @@
         <h1>Əməliyyatlar</h1>
         <p class="page-subtitle">Anbar daxilolmalarını və itkiləri idarə edin</p>
       </div>
-      <nav class="page-nav">
-        <a href="/">Məhsullar</a>
-        <a href="/operations" class="active">Əməliyyatlar</a>
-        <a href="/reports">Hesabatlar</a>
-      </nav>
+      <div class="page-actions">
+        <nav class="page-nav">
+          <a href="/">Məhsullar</a>
+          <a href="/operations" class="active">Əməliyyatlar</a>
+          <a href="/reports">Hesabatlar</a>
+        </nav>
+        <div class="user-chip">
+          Müdir
+          <a href="{{ url_for('logout') }}" class="logout-link">Çıxış</a>
+        </div>
+      </div>
     </div>
 
     <div class="container">

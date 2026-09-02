@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="az">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>POS - Giriş</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+  </head>
+  <body>
+    <div class="login-shell">
+      <div class="login-card">
+        <h1>POS</h1>
+        <p>İstifadəçi kodunu daxil edin</p>
+
+        <form method="post" action="{{ url_for('login_page') }}" class="login-form">
+          <input
+            class="pin-input"
+            type="password"
+            name="pin"
+            inputmode="numeric"
+            maxlength="4"
+            pattern="[0-9]*"
+            placeholder="••••"
+            aria-label="PIN kodu"
+            autocomplete="one-time-code"
+            required
+          >
+
+          <div class="pin-actions">
+            <div class="pin-keypad" aria-label="PIN keypad">
+              <button type="button" class="key-btn" data-value="1">1</button>
+              <button type="button" class="key-btn" data-value="2">2</button>
+              <button type="button" class="key-btn" data-value="3">3</button>
+              <button type="button" class="key-btn" data-value="4">4</button>
+              <button type="button" class="key-btn" data-value="5">5</button>
+              <button type="button" class="key-btn" data-value="6">6</button>
+              <button type="button" class="key-btn" data-value="7">7</button>
+              <button type="button" class="key-btn" data-value="8">8</button>
+              <button type="button" class="key-btn" data-value="9">9</button>
+              <button type="button" class="key-btn" data-action="clear">Sil</button>
+              <button type="button" class="key-btn" data-value="0">0</button>
+              <button type="submit" class="key-btn submit">Giriş</button>
+            </div>
+          </div>
+
+          <div class="login-alert" aria-live="polite">{{ error or '' }}</div>
+          <div class="login-hint">Satıcı: 1111 &nbsp;•&nbsp; Müdir: 1991</div>
+        </form>
+      </div>
+    </div>
+
+    <script>
+      const pinInput = document.querySelector('.pin-input');
+      document.querySelectorAll('.key-btn').forEach(button => {
+        button.addEventListener('click', () => {
+          const action = button.dataset.action;
+          const value = button.dataset.value;
+
+          if (action === 'clear') {
+            pinInput.value = '';
+            pinInput.focus();
+            return;
+          }
+
+          if (!value) return;
+          if (pinInput.value.length >= 4) return;
+          pinInput.value += value;
+          pinInput.focus();
+        });
+      });
+    </script>
+  </body>
+</html>

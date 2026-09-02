@@ -12,13 +12,29 @@ import sqlite3
 
 import psycopg2
 from dotenv import load_dotenv
-from flask import Flask, g, jsonify, render_template, request
+from flask import (
+    Flask,
+    abort,
+    g,
+    jsonify,
+    redirect,
+    render_template,
+    request,
+    session,
+    url_for,
+)
 from psycopg2.extras import RealDictCursor
 
 load_dotenv()
 
 app = Flask(__name__)
 app.config["JSON_SORT_KEYS"] = False
+app.config["SECRET_KEY"] = os.getenv("SECRET_KEY", "pos-pin-key-2026")
+
+PIN_USERS = {
+    "1111": "seller",
+    "1991": "manager",
+}
 
 DEFAULT_PRODUCTS = [
     ("Cola 0.5", "Drinks", 2.00, 50, None),
@@ -137,6 +153,58 @@ def close_db(exc=None):
     db = g.pop("db", None)
     if db is not None:
         db.close()
+
+
+@app.before_request
+def enforce_access():
+    """Restrict pages based on the logged-in user role."""
+    if request.endpoint in {None, 'static', 'login_page', 'logout'}:
+        return None
+    if not session.get('role'):
+        return redirect(url_for('login_page'))
+
+    role = session.get('role')
+    protected_pages = {'operations_page', 'reports_page'}
+    protected_actions = {
+        'add_movement',
+        'api_reports',
+        'add_product',
+        'update_product',
+        'delete_product',
+        'add_category',
+        'rename_category',
+        'delete_category',
+    }
+
+    if request.endpoint in protected_pages and role != 'manager':
+        return abort(403)
+    if request.endpoint in protected_actions and role != 'manager':
+        return jsonify({'success': False, 'message': 'Bu əməliyyat üçün icazə yoxdur.'}), 403
+
+
+@app.route('/login', methods=['GET', 'POST'])
+def login_page():
+    """Authenticate a seller or manager using a 4-digit PIN."""
+    if session.get('role'):
+        return redirect(url_for('products_page'))
+
+    error = None
+    if request.method == 'POST':
+        pin = str(request.form.get('pin', '')).strip()
+        role = PIN_USERS.get(pin)
+        if role:
+            session.clear()
+            session['role'] = role
+            return redirect(url_for('products_page'))
+        error = 'Yanlış PIN kodu.'
+
+    return render_template('login.html', error=error)
+
+
+@app.route('/logout')
+def logout():
+    session.clear()
+    return redirect(url_for('login_page'))
 
 
 def _create_tables_postgres(conn):
