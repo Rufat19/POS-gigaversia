@@ -14,76 +14,227 @@
         <p class="page-subtitle">Müştəri sifarişləri üçün professional POS təcrübəsi</p>
       </div>
       <div class="page-actions">
+        <div class="lang-switcher" aria-label="Dil seçimi">
+          <label class="lang-select-wrap" for="products-lang-select">
+            <span class="sr-only">Dil</span>
+            <select id="products-lang-select" class="lang-select" aria-label="Dil seçimi">
+              <option value="az">Aze</option>
+              <option value="en">Eng</option>
+              <option value="ru">Rus</option>
+              <option value="tr">Tur</option>
+            </select>
+          </label>
+        </div>
         <nav class="page-nav">
-          <a href="/" class="active">Məhsullar</a>
+          <a href="/" class="active" data-i18n="nav.products">Məhsullar</a>
           {% if session.get('role') == 'manager' %}
-            <a href="/operations">Əməliyyatlar</a>
-            <a href="/reports">Hesabatlar</a>
+            <a href="/operations" data-i18n="nav.operations">Əməliyyatlar</a>
+            <a href="/reports" data-i18n="nav.reports">Hesabatlar</a>
           {% endif %}
         </nav>
         <div class="user-chip">
-          {{ 'Müdir' if session.get('role') == 'manager' else 'Satıcı' }}
-          <a href="{{ url_for('logout') }}" class="logout-link">Çıxış</a>
+          <span id="session-role-label" data-i18n="role.seller">{{ 'Müdir' if session.get('role') == 'manager' else 'Satıcı' }}</span>
+          <a href="{{ url_for('logout') }}" class="logout-link" data-i18n="common.logout">Çıxış</a>
         </div>
       </div>
     </div>
 
-    <div class="layout-row">
-      <main>
-        <section class="section-filters">
-          <div class="search-panel">
-            <input id="product-search" type="text" placeholder="Məhsul adını yazın..." aria-label="Məhsul axtar">
+    <div class="layout-row pos-layout">
+      <aside class="pos-cart-panel">
+        <div class="cart-box-main">
+          <div class="cart-header-row">
+            <h2 class="cart-title" data-i18n="cart.title">Səbət</h2>
+            <span class="cart-badge" id="cart-count">0</span>
           </div>
-          <div class="filters-flex">
-            <button class="btn filter-btn" data-category="All" data-base="Bütün məhsullar" onclick="filterCategory('All')">Bütün məhsullar</button>
-            {% for cat in categories %}
-              <button class="btn filter-btn" data-category="{{ cat }}" data-base="{{ cat }}" onclick="filterCategory('{{ cat }}')">{{ cat }}</button>
-            {% endfor %}
-            <div class="filter-count-label">Məhsullar: {{ products|length }}</div>
+          <div id="cart-items" class="cart-items-box" data-i18n="cart.empty">Səbət hələ boşdur.</div>
+          <div class="total" id="cart-total" data-i18n="cart.total">Ümumi məbləğ: 0.00 AZN</div>
+          <div class="checkout-actions">
+            <button class="checkout-btn" type="button" onclick="checkout()" data-i18n="cart.checkout">Satışı təsdiqlə</button>
+            <button class="clear-btn" type="button" onclick="cart.length=0; renderCart();" data-i18n="cart.clear">Təmizlə</button>
+          </div>
+          <div id="checkout-message" class="checkout-message"></div>
+        </div>
+      </aside>
+
+      <main class="pos-main">
+        <section class="section-filters pos-toolbar">
+          <div class="toolbar-left">
+            <button class="toolbar-home" type="button" aria-label="Ana səhifə" data-i18n="common.home">⌂</button>
+            <div class="search-panel">
+               <input id="product-search" type="text" placeholder="Məhsul axtar..." aria-label="Məhsul axtar" data-i18n-placeholder="search.products">
+            </div>
+          </div>
+          <div class="toolbar-right">
+             <button class="toolbar-badge" data-i18n="common.newOrder">Yeni sifariş</button>
+             <button class="toolbar-icon" type="button" aria-label="Ayarlar" data-i18n="common.settings">⚙</button>
           </div>
         </section>
 
-        <section id="products-grid" class="products-grid">
+        <div class="filters-flex pos-categories">
+          <button class="btn filter-btn active" data-category="All" data-base="Bütün məhsullar" onclick="filterCategory('All')" data-i18n="filter.all">Bütün</button>
+          {% for cat in categories %}
+            <button class="btn filter-btn" data-category="{{ cat }}" data-base="{{ cat }}" onclick="filterCategory('{{ cat }}')">{{ cat }}</button>
+          {% endfor %}
+          <div class="filter-count-label" data-i18n="products.count">Məhsullar: {{ products|length }}</div>
+        </div>
+
+        <section id="products-grid" class="products-grid pos-grid">
           {% for product in products %}
             <div class="product-card" data-category="{{ product.category }}">
-              <div class="product-img-wrapper">
-                <img src="{{ product.image_url or url_for('static', filename='img/placeholder.svg') }}" alt="{{ product.name }}" class="product-img-placeholder">
-              </div>
+              <div class="product-card-bg"></div>
+              <div class="product-price-tag">{{ "%.2f" | format(product.price) }} AZN</div>
               <div class="product-name-text">{{ product.name }}</div>
-              <div class="product-category-pill">{{ product.category }}</div>
-              <div class="product-info-row">
-                <div class="product-price-text">{{ "%.2f" | format(product.price) }} AZN</div>
-                <div class="product-stock-text">Stok: <span id="stock-{{ product.id }}">{{ product.stock }}</span></div>
+              <div class="product-meta-row">
+                <span class="product-category-pill">{{ product.category }}</span>
+                <span class="product-stock-text">Stok: <span id="stock-{{ product.id }}">{{ product.stock }}</span></span>
               </div>
-
               <div class="product-actions-row">
                 <input type="number" min="1" value="1" class="qty-input" id="qty-{{ product.id }}" placeholder="Miqdar" title="Miqdar" aria-label="Miqdar for {{ product.name }}">
-                <button class="add-btn" type="button" data-id="{{ product.id }}" data-name="{{ product.name }}" data-price="{{ product.price }}" onclick="addToCart(this)">Seç</button>
+                <button class="add-btn" type="button" data-id="{{ product.id }}" data-name="{{ product.name }}" data-price="{{ product.price }}" onclick="addToCart(this)">+</button>
               </div>
             </div>
           {% endfor %}
         </section>
       </main>
-
-      <aside>
-        <div class="cart-box-main">
-          <h2 class="cart-title">Səbət</h2>
-          <div id="cart-items">Səbət hələ boşdur.</div>
-          <div class="total" id="cart-total">Ümumi məbləğ: 0.00 AZN</div>
-          <div class="checkout-actions">
-            <button class="checkout-btn" type="button" onclick="checkout()">Satışı təsdiqlə</button>
-            <button class="clear-btn" type="button" onclick="cart.length=0; renderCart();">Təmizlə</button>
-          </div>
-          <div id="checkout-message" class="checkout-message"></div>
-        </div>
-      </aside>
     </div>
 
     <script>
       // App JS - improved and organized
+      const currentRole = '{{ "manager" if session.get("role") == "manager" else "seller" }}';
+      const translations = {
+        az: {
+          'nav.products': 'Məhsullar',
+          'nav.operations': 'Əməliyyatlar',
+          'nav.reports': 'Hesabatlar',
+          'role.seller': 'Satıcı',
+          'role.manager': 'Müdir',
+          'common.logout': 'Çıxış',
+          'common.home': '⌂',
+          'common.newOrder': 'Yeni sifariş',
+          'common.settings': '⚙',
+          'search.products': 'Məhsul axtar...',
+          'filter.all': 'Bütün',
+          'products.count': 'Məhsullar: ',
+          'cart.title': 'Səbət',
+          'cart.empty': 'Səbət hələ boşdur.',
+          'cart.total': 'Ümumi məbləğ: ',
+          'cart.checkout': 'Satışı təsdiqlə',
+          'cart.clear': 'Təmizlə',
+          'alert.minQty': 'Miqdar 1-dən az ola bilməz.',
+          'alert.stock': 'Seçilən miqdar mövcud stokdan çoxdur.',
+          'alert.emptyCart': 'Səbət boşdur.',
+          'checkout.processing': 'Satış yazılır...',
+          'checkout.success': 'Satış tamamlandı!',
+          'checkout.defaultError': 'Satış uğursuz oldu.'
+        },
+        en: {
+          'nav.products': 'Products',
+          'nav.operations': 'Operations',
+          'nav.reports': 'Reports',
+          'role.seller': 'Seller',
+          'role.manager': 'Manager',
+          'common.logout': 'Logout',
+          'common.home': '⌂',
+          'common.newOrder': 'New order',
+          'common.settings': '⚙',
+          'search.products': 'Search products...',
+          'filter.all': 'All',
+          'products.count': 'Products: ',
+          'cart.title': 'Cart',
+          'cart.empty': 'Cart is empty.',
+          'cart.total': 'Total: ',
+          'cart.checkout': 'Confirm sale',
+          'cart.clear': 'Clear',
+          'alert.minQty': 'Quantity cannot be less than 1.',
+          'alert.stock': 'Selected quantity exceeds available stock.',
+          'alert.emptyCart': 'Cart is empty.',
+          'checkout.processing': 'Processing sale...',
+          'checkout.success': 'Sale completed!',
+          'checkout.defaultError': 'Sale failed.'
+        },
+        ru: {
+          'nav.products': 'Товары',
+          'nav.operations': 'Операции',
+          'nav.reports': 'Отчеты',
+          'role.seller': 'Продавец',
+          'role.manager': 'Менеджер',
+          'common.logout': 'Выход',
+          'common.home': '⌂',
+          'common.newOrder': 'Новый заказ',
+          'common.settings': '⚙',
+          'search.products': 'Поиск товаров...',
+          'filter.all': 'Все',
+          'products.count': 'Товары: ',
+          'cart.title': 'Корзина',
+          'cart.empty': 'Корзина пуста.',
+          'cart.total': 'Итого: ',
+          'cart.checkout': 'Подтвердить продажу',
+          'cart.clear': 'Очистить',
+          'alert.minQty': 'Количество не может быть меньше 1.',
+          'alert.stock': 'Выбранное количество превышает доступный остаток.',
+          'alert.emptyCart': 'Корзина пуста.',
+          'checkout.processing': 'Обработка продажи...',
+          'checkout.success': 'Продажа завершена!',
+          'checkout.defaultError': 'Продажа не удалась.'
+        },
+        tr: {
+          'nav.products': 'Ürünler',
+          'nav.operations': 'İşlemler',
+          'nav.reports': 'Raporlar',
+          'role.seller': 'Satıcı',
+          'role.manager': 'Yönetici',
+          'common.logout': 'Çıkış',
+          'common.home': '⌂',
+          'common.newOrder': 'Yeni sipariş',
+          'common.settings': '⚙',
+          'search.products': 'Ürün ara...',
+          'filter.all': 'Tümü',
+          'products.count': 'Ürünler: ',
+          'cart.title': 'Sepet',
+          'cart.empty': 'Sepet boş.',
+          'cart.total': 'Toplam: ',
+          'cart.checkout': 'Satışı onayla',
+          'cart.clear': 'Temizle',
+          'alert.minQty': 'Miktar 1\'den küçük olamaz.',
+          'alert.stock': 'Seçilen miktar mevcut stoktan fazladır.',
+          'alert.emptyCart': 'Sepet boş.',
+          'checkout.processing': 'Satış işleniyor...',
+          'checkout.success': 'Satış tamamlandı!',
+          'checkout.defaultError': 'Satış başarısız oldu.'
+        }
+      };
       const cart = [];
       let activeCategory = 'All';
       let searchTerm = '';
+      let currentLang = localStorage.getItem('pos_lang') || 'az';
+
+      function applyLanguage(lang) {
+        currentLang = lang in translations ? lang : 'az';
+        const dict = translations[currentLang];
+        document.querySelectorAll('[data-i18n]').forEach((el) => {
+          const key = el.dataset.i18n;
+          if (dict[key] !== undefined) el.textContent = dict[key];
+        });
+        document.querySelectorAll('[data-i18n-placeholder]').forEach((el) => {
+          const key = el.dataset.i18nPlaceholder;
+          if (dict[key] !== undefined) el.placeholder = dict[key];
+        });
+        const roleLabel = document.getElementById('session-role-label');
+        if (roleLabel) {
+          roleLabel.textContent = dict[currentRole === 'manager' ? 'role.manager' : 'role.seller'];
+        }
+        const langSelect = document.getElementById('products-lang-select');
+        if (langSelect) {
+          langSelect.value = currentLang;
+        }
+        const countLabel = document.querySelector('.filter-count-label');
+        if (countLabel) {
+          const visible = Array.from(document.querySelectorAll('.products-grid .product-card')).filter((card) => card.style.display !== 'none').length;
+          countLabel.textContent = `${dict['products.count']}${visible}`;
+        }
+        localStorage.setItem('pos_lang', currentLang);
+        document.documentElement.lang = currentLang;
+      }
 
       function applyProductFilters() {
         const cards = document.querySelectorAll('.products-grid .product-card');
@@ -103,10 +254,10 @@
 
       function filterCategory(cat) {
         activeCategory = cat;
-        document.querySelectorAll('.filters-flex .btn').forEach(b => b.classList.remove('filter-active'));
+        document.querySelectorAll('.filters-flex .filter-btn').forEach(b => b.classList.remove('active', 'filter-active'));
         const buttons = Array.from(document.querySelectorAll('.filters-flex .filter-btn'));
         const active = buttons.find(b => b.dataset.category === cat);
-        if (active) active.classList.add('filter-active');
+        if (active) active.classList.add('active');
         applyProductFilters();
       }
 
@@ -114,7 +265,8 @@
         const countLabel = document.querySelector('.filter-count-label');
         if (!countLabel) return;
         const visible = visibleOverride ?? Array.from(document.querySelectorAll('.products-grid .product-card')).filter(card => card.style.display !== 'none').length;
-        countLabel.textContent = `Məhsullar: ${visible}`;
+        const labelPrefix = translations[currentLang]['products.count'];
+        countLabel.textContent = `${labelPrefix}${visible}`;
       }
 
       function addToCart(button) {
@@ -124,13 +276,13 @@
         const qtyInput = document.getElementById('qty-' + id);
         const quantity = Number(qtyInput.value || 1);
 
-        if (quantity < 1) { alert('Miqdar 1-dən az ola bilməz.'); return; }
+       if (quantity < 1) { alert(translations[currentLang]['alert.minQty']); return; }
 
         const stockEl = document.getElementById('stock-' + id);
         const available = stockEl ? Number(stockEl.textContent || 0) : null;
         const existing = cart.find(item => item.id === id);
         const alreadyInCart = existing ? existing.quantity : 0;
-        if (available !== null && (quantity + alreadyInCart) > available) { alert('Seçilən miqdar mövcud stokdan çoxdur.'); return; }
+       if (available !== null && (quantity + alreadyInCart) > available) { alert(translations[currentLang]['alert.stock']); return; }
  
        if (existing) existing.quantity += quantity; else cart.push({ id, name, price, quantity });
        renderCart();
@@ -141,41 +293,47 @@
       function renderCart(){
         const cartItems = document.getElementById('cart-items');
         const cartTotal = document.getElementById('cart-total');
-        if(cart.length===0){ cartItems.innerHTML='Səbət hələ boşdur.'; cartTotal.textContent='Ümumi məbləğ: 0.00 AZN'; return; }
+        const cartCount = document.getElementById('cart-count');
+       const dict = translations[currentLang];
+       if(cart.length===0){
+         cartItems.innerHTML=dict['cart.empty'];
+         cartTotal.textContent=`${dict['cart.total']}0.00 AZN`;
+         if (cartCount) cartCount.textContent = '0';
+         return;
+       }
 
-        const list = document.createElement('div'); list.className='cart-list';
-        let total=0;
-        cart.forEach((item, idx)=>{
-          const line = document.createElement('div'); line.className='cart-item';
-          const left = document.createElement('div'); left.className='left';
-          const name = document.createElement('div'); name.className='name'; name.textContent=item.name;
-          const qty = document.createElement('div'); qty.textContent='×'+item.quantity;
-          left.append(name, qty);
-          const right = document.createElement('div');
-          const price = document.createElement('div'); price.textContent=(item.price*item.quantity).toFixed(2)+' AZN';
-          const del = document.createElement('button'); del.className='btn'; del.textContent='Sil'; del.onclick=()=>removeFromCart(idx);
-          right.append(price, del);
-          line.append(left,right);
-          list.appendChild(line);
-          total+=item.price*item.quantity;
-        });
-        cartItems.innerHTML=''; cartItems.appendChild(list);
-        cartTotal.textContent=`Ümumi məbləğ: ${total.toFixed(2)} AZN`;
+       const list = document.createElement('div'); list.className='cart-list';
+       let total=0;
+       cart.forEach((item, idx)=>{
+         const line = document.createElement('div'); line.className='cart-item';
+         const left = document.createElement('div'); left.className='left';
+         const name = document.createElement('div'); name.className='name'; name.textContent=item.name;
+         const qty = document.createElement('div'); qty.className='qty'; qty.textContent='×'+item.quantity;
+         left.append(name, qty);
+         const right = document.createElement('div'); right.className='right';
+         const price = document.createElement('div'); price.className='price'; price.textContent=(item.price*item.quantity).toFixed(2)+' AZN';
+         const del = document.createElement('button'); del.textContent='Sil'; del.onclick=()=>removeFromCart(idx);
+         right.append(price, del);
+         line.append(left,right);
+         list.appendChild(line);
+         total+=item.price*item.quantity;
+       });
+       cartItems.innerHTML=''; cartItems.appendChild(list);
+       cartTotal.textContent=`${dict['cart.total']}${total.toFixed(2)} AZN`;
+       if (cartCount) cartCount.textContent = String(cart.length);
       }
 
       async function checkout(){
-        if(cart.length===0){ alert('Səbət boşdur.'); return; }
-        const messageBox=document.getElementById('checkout-message'); messageBox.textContent='Satış yazılır...';
-        try{
-          const response = await fetch('/checkout',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({cart})});
-          const result = await response.json(); if(!response.ok) throw new Error(result.message||'Satış uğursuz oldu.');
-          messageBox.textContent = result.message || 'Satış tamamlandı!';
-          // update stocks locally
+       if(cart.length===0){ alert(translations[currentLang]['alert.emptyCart']); return; }
+       const messageBox=document.getElementById('checkout-message'); messageBox.textContent=translations[currentLang]['checkout.processing'];
+       try{
+         const response = await fetch('/checkout',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({cart})});
+         const result = await response.json(); if(!response.ok) throw new Error(result.message||translations[currentLang]['checkout.defaultError']);
+         messageBox.textContent = result.message || translations[currentLang]['checkout.success'];
           cart.forEach(item=>{ const stockEl=document.getElementById('stock-'+item.id); if(stockEl){ const current=Number(stockEl.textContent||0); stockEl.textContent=Math.max(0,current-item.quantity); } });
-          // print receipt
-          try{ printReceipt(result, cart); }catch(e){ console.error('Print error',e); }
-          cart.length=0; renderCart();
-        }catch(err){ messageBox.textContent=err.message; }
+         try{ printReceipt(result, cart); }catch(e){ console.error('Print error',e); }
+         cart.length=0; renderCart();
+       }catch(err){ messageBox.textContent=err.message; }
       }
 
       // print receipt helper
@@ -214,6 +372,13 @@
             applyProductFilters();
           });
         }
+
+        const languageSelect = document.getElementById('products-lang-select');
+        if (languageSelect) {
+          languageSelect.addEventListener('change', (event) => applyLanguage(event.target.value));
+        }
+
+        applyLanguage(currentLang);
         filterCategory('All');
       });
     </script>

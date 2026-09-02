@@ -9,8 +9,20 @@
   <body>
     <div class="login-shell">
       <div class="login-card">
-        <h1>POS</h1>
-        <p>İstifadəçi kodunu daxil edin</p>
+        <div class="lang-switcher lang-switcher-login" aria-label="Dil seçimi" style="margin: 0 auto 18px; justify-content: center;">
+          <label class="lang-select-wrap" for="login-lang-select">
+            <span class="sr-only">Dil</span>
+            <select id="login-lang-select" class="lang-select" aria-label="Dil seçimi">
+              <option value="az">Aze</option>
+              <option value="en">Eng</option>
+              <option value="ru">Rus</option>
+              <option value="tr">Tur</option>
+            </select>
+          </label>
+        </div>
+
+        <h1 data-i18n="common.pos">POS</h1>
+        <p data-i18n="login.title">İstifadəçi kodunu daxil edin</p>
 
         <form method="post" action="{{ url_for('login_page') }}" class="login-form">
           <input
@@ -21,8 +33,9 @@
             maxlength="4"
             pattern="[0-9]*"
             placeholder="••••"
-            aria-label="PIN kodu"
+            aria-label="PIN"
             autocomplete="one-time-code"
+            data-i18n-placeholder="login.pinPlaceholder"
             required
           >
 
@@ -37,20 +50,83 @@
               <button type="button" class="key-btn" data-value="7">7</button>
               <button type="button" class="key-btn" data-value="8">8</button>
               <button type="button" class="key-btn" data-value="9">9</button>
-              <button type="button" class="key-btn" data-action="clear">Sil</button>
+              <button type="button" class="key-btn" data-action="clear" data-i18n="login.clear">Sil</button>
               <button type="button" class="key-btn" data-value="0">0</button>
-              <button type="submit" class="key-btn submit">Giriş</button>
+              <button type="submit" class="key-btn submit" data-i18n="login.submit">Giriş</button>
             </div>
           </div>
 
           <div class="login-alert" aria-live="polite">{{ error or '' }}</div>
-          <div class="login-hint">Satıcı: 1111 &nbsp;•&nbsp; Müdir: 1991</div>
+          <div class="login-hint" data-i18n="login.hint">Satıcı və müdir üçün giriş</div>
         </form>
       </div>
     </div>
 
     <script>
+      const translations = {
+        az: {
+          'common.pos': 'POS',
+          'login.title': 'İstifadəçi kodunu daxil edin',
+          'login.pinPlaceholder': '••••',
+          'login.clear': 'Sil',
+          'login.submit': 'Giriş',
+          'login.hint': 'Satıcı və müdir üçün giriş'
+        },
+        en: {
+          'common.pos': 'POS',
+          'login.title': 'Enter user code',
+          'login.pinPlaceholder': '••••',
+          'login.clear': 'Clear',
+          'login.submit': 'Login',
+          'login.hint': 'Seller and manager sign-in'
+        },
+        ru: {
+          'common.pos': 'POS',
+          'login.title': 'Введите код пользователя',
+          'login.pinPlaceholder': '••••',
+          'login.clear': 'Сброс',
+          'login.submit': 'Войти',
+          'login.hint': 'Вход для продавца и менеджера'
+        },
+        tr: {
+          'common.pos': 'POS',
+          'login.title': 'Kullanıcı kodunu girin',
+          'login.pinPlaceholder': '••••',
+          'login.clear': 'Temizle',
+          'login.submit': 'Giriş',
+          'login.hint': 'Satıcı ve yöneticiler için giriş'
+        }
+      };
+
+      let currentLang = localStorage.getItem('pos_lang') || 'az';
       const pinInput = document.querySelector('.pin-input');
+
+      function applyLanguage(lang) {
+        currentLang = lang in translations ? lang : 'az';
+        const dict = translations[currentLang];
+        document.querySelectorAll('[data-i18n]').forEach((el) => {
+          if (dict[el.dataset.i18n] !== undefined) {
+            el.textContent = dict[el.dataset.i18n];
+          }
+        });
+        document.querySelectorAll('[data-i18n-placeholder]').forEach((el) => {
+          if (dict[el.dataset.i18nPlaceholder] !== undefined) {
+            el.placeholder = dict[el.dataset.i18nPlaceholder];
+          }
+        });
+        const langSelect = document.getElementById('login-lang-select');
+        if (langSelect) {
+          langSelect.value = currentLang;
+        }
+        localStorage.setItem('pos_lang', currentLang);
+        document.documentElement.lang = currentLang;
+      }
+
+      const languageSelector = document.getElementById('login-lang-select');
+      if (languageSelector) {
+        languageSelector.addEventListener('change', (event) => applyLanguage(event.target.value));
+      }
+
       document.querySelectorAll('.key-btn').forEach(button => {
         button.addEventListener('click', () => {
           const action = button.dataset.action;
@@ -68,6 +144,8 @@
           pinInput.focus();
         });
       });
+
+      applyLanguage(currentLang);
     </script>
   </body>
 </html>

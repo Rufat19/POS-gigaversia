@@ -13,14 +13,25 @@
         <p class="page-subtitle">Anbar daxilolmalarını və itkiləri idarə edin</p>
       </div>
       <div class="page-actions">
+        <div class="lang-switcher" aria-label="Dil seçimi">
+          <label class="lang-select-wrap" for="operations-lang-select">
+            <span class="sr-only">Dil</span>
+            <select id="operations-lang-select" class="lang-select" aria-label="Dil seçimi">
+              <option value="az">Aze</option>
+              <option value="en">Eng</option>
+              <option value="ru">Rus</option>
+              <option value="tr">Tur</option>
+            </select>
+          </label>
+        </div>
         <nav class="page-nav">
-          <a href="/">Məhsullar</a>
-          <a href="/operations" class="active">Əməliyyatlar</a>
-          <a href="/reports">Hesabatlar</a>
+          <a href="/" data-i18n="nav.products">Məhsullar</a>
+          <a href="/operations" class="active" data-i18n="nav.operations">Əməliyyatlar</a>
+          <a href="/reports" data-i18n="nav.reports">Hesabatlar</a>
         </nav>
         <div class="user-chip">
-          Müdir
-          <a href="{{ url_for('logout') }}" class="logout-link">Çıxış</a>
+          <span data-i18n="role.manager">Müdir</span>
+          <a href="{{ url_for('logout') }}" class="logout-link" data-i18n="common.logout">Çıxış</a>
         </div>
       </div>
     </div>
@@ -28,21 +39,21 @@
     <div class="container">
       <div class="operations-grid">
         <section class="card operations-card">
-          <h3>Kateqoriyalar</h3>
+          <h3 data-i18n="operations.categories">Kateqoriyalar</h3>
           <div class="form-grid">
             <label class="form-group">
-              Yeni kateqoriya
-              <input id="new-category-name" placeholder="Məs. Fastfood">
+              <span data-i18n="operations.newCategory">Yeni kateqoriya</span>
+              <input id="new-category-name" placeholder="Məs. Fastfood" data-i18n-placeholder="operations.newCategoryPlaceholder">
             </label>
             <div class="form-actions">
-              <button id="add-category-btn" class="add-btn" type="button">Kateqoriya əlavə et</button>
+              <button id="add-category-btn" class="add-btn" type="button" data-i18n="operations.addCategory">Kateqoriya əlavə et</button>
               <div id="category-msg" class="form-message"></div>
             </div>
           </div>
 
           <div class="form-grid" style="margin-top:18px;">
             <label class="form-group">
-              Dəyişdiriləcək kateqoriya
+              <span data-i18n="operations.renameSelect">Dəyişdiriləcək kateqoriya</span>
               <select id="rename-category-select">
                 {% for cat in categories %}
                   <option value="{{ cat }}">{{ cat }}</option>
@@ -50,17 +61,17 @@
               </select>
             </label>
             <label class="form-group">
-              Yeni ad
-              <input id="rename-category-name" placeholder="Yeni kateqoriya adı">
+              <span data-i18n="operations.renameName">Yeni ad</span>
+              <input id="rename-category-name" placeholder="Yeni kateqoriya adı" data-i18n-placeholder="operations.renameNamePlaceholder">
             </label>
             <div class="form-actions">
-              <button id="rename-category-btn" class="btn secondary" type="button">Dəyişdir</button>
+              <button id="rename-category-btn" class="btn secondary" type="button" data-i18n="operations.renameButton">Dəyişdir</button>
             </div>
           </div>
 
           <div class="form-grid" style="margin-top:18px;">
             <label class="form-group">
-              Silinəcək kateqoriya
+              <span data-i18n="operations.deleteSelect">Silinəcək kateqoriya</span>
               <select id="delete-category-select">
                 {% for cat in categories %}
                   <option value="{{ cat }}">{{ cat }}</option>
@@ -68,20 +79,20 @@
               </select>
             </label>
             <div class="form-actions">
-              <button id="delete-category-btn" class="btn danger" type="button">Kateqoriyanı sil</button>
+              <button id="delete-category-btn" class="btn danger" type="button" data-i18n="operations.deleteCategory">Kateqoriyanı sil</button>
             </div>
           </div>
         </section>
 
         <section class="card operations-card">
-          <h3>Məhsul əlavə et</h3>
+          <h3 data-i18n="operations.addProduct">Məhsul əlavə et</h3>
           <div class="form-grid">
             <label class="form-group">
-              Məhsul adı
-              <input id="new-product-name" placeholder="Məhsul adı">
+              <span data-i18n="operations.productName">Məhsul adı</span>
+              <input id="new-product-name" placeholder="Məhsul adı" data-i18n-placeholder="operations.productNamePlaceholder">
             </label>
             <label class="form-group">
-              Kateqoriya
+              <span data-i18n="operations.category">Kateqoriya</span>
               <select id="new-product-category">
                 {% for cat in categories %}
                   <option value="{{ cat }}">{{ cat }}</option>
@@ -89,26 +100,26 @@
               </select>
             </label>
             <label class="form-group">
-              Qiymət
+              <span data-i18n="operations.price">Qiymət</span>
               <input id="new-product-price" type="number" step="0.01" min="0" value="0">
             </label>
             <label class="form-group">
-              Stok
+              <span data-i18n="operations.stock">Stok</span>
               <input id="new-product-stock" type="number" min="0" value="0">
             </label>
             <label class="form-group">
-              Şəkil URL
-              <input id="new-product-image" placeholder="(isteğe bağlı)">
+              <span data-i18n="operations.imageUrl">Şəkil URL</span>
+              <input id="new-product-image" placeholder="(isteğe bağlı)" data-i18n-placeholder="operations.imagePlaceholder">
             </label>
             <div class="form-actions">
-              <button id="add-product-btn" class="add-btn" type="button">Məhsul əlavə et</button>
+              <button id="add-product-btn" class="add-btn" type="button" data-i18n="operations.addProduct">Məhsul əlavə et</button>
               <div id="product-msg" class="form-message"></div>
             </div>
           </div>
         </section>
 
         <section class="card operations-card">
-          <h3>Məhsul idarəetməsi</h3>
+          <h3 data-i18n="operations.manageProducts">Məhsul idarəetməsi</h3>
           <div id="product-management-list" class="management-list">
             {% for p in products %}
               <div class="management-row" data-product-id="{{ p[0] }}" data-product-name="{{ p[1] }}" data-product-category="{{ p[2] if p|length > 2 else 'Other' }}" data-product-price="{{ p[3] }}" data-product-stock="{{ p[4] }}" data-product-image="{{ p[5] if p|length > 5 else '' }}">
@@ -117,8 +128,8 @@
                   <span>{{ p[2] }} · {{ p[3] }} AZN · Stok: {{ p[4] }}</span>
                 </div>
                 <div class="inline-actions">
-                  <button class="btn secondary product-edit-btn" type="button">Edit</button>
-                  <button class="btn danger product-delete-btn" type="button">Delete</button>
+                  <button class="btn secondary product-edit-btn" type="button" data-i18n="operations.edit">Edit</button>
+                  <button class="btn danger product-delete-btn" type="button" data-i18n="operations.delete">Delete</button>
                 </div>
               </div>
             {% endfor %}
@@ -126,10 +137,10 @@
         </section>
 
         <section class="card operations-card">
-          <h3>Daxilolma / İtki əlavə et</h3>
+          <h3 data-i18n="operations.stockMovement">Daxilolma / İtki əlavə et</h3>
           <div class="form-grid">
             <label class="form-group">
-              Məhsul
+              <span data-i18n="operations.product">Məhsul</span>
               <select id="mov-product">
                 {% for p in products %}
                   <option value="{{ p[0] }}">{{ p[1] }}</option>
@@ -137,22 +148,22 @@
               </select>
             </label>
             <label class="form-group">
-              Növ
+              <span data-i18n="operations.type">Növ</span>
               <select id="mov-type">
-                <option value="daxilolma">Daxilolma</option>
-                <option value="itki">İtki</option>
+                <option value="daxilolma" data-i18n="operations.incoming">Daxilolma</option>
+                <option value="itki" data-i18n="operations.loss">İtki</option>
               </select>
             </label>
             <label class="form-group">
-              Miqdar
-              <input id="mov-qty" type="number" min="1" value="1" placeholder="Miqdar">
+              <span data-i18n="operations.quantity">Miqdar</span>
+              <input id="mov-qty" type="number" min="1" value="1" placeholder="Miqdar" data-i18n-placeholder="operations.quantityPlaceholder">
             </label>
             <label class="form-group">
-              Qeyd
-              <input id="mov-note" placeholder="Qeyd (istəyə bağlı)">
+              <span data-i18n="operations.note">Qeyd</span>
+              <input id="mov-note" placeholder="Qeyd (istəyə bağlı)" data-i18n-placeholder="operations.notePlaceholder">
             </label>
             <div class="form-actions">
-              <button id="mov-add" class="add-btn">Əlavə et</button>
+              <button id="mov-add" class="add-btn" data-i18n="operations.add">Əlavə et</button>
               <div id="mov-msg" class="form-message"></div>
             </div>
           </div>
@@ -160,53 +171,54 @@
 
         <section class="card operations-card history-card">
           <div class="history-header-row">
-            <h3>Tarixçə</h3>
+            <h3 data-i18n="operations.history">Tarixçə</h3>
             <div class="history-meta">
-              <span id="history-count">0</span> əməliyyat
+              <span id="history-count">0</span>
+              <span data-i18n="operations.historyCount">əməliyyat</span>
             </div>
           </div>
-
+ 
           <div class="history-presets" aria-label="Tarixçə qısa filtrləri">
-            <button class="preset-btn active" data-range="7" type="button">Son 7 gün</button>
-            <button class="preset-btn" data-range="30" type="button">Son 30 gün</button>
-            <button class="preset-btn" data-range="month" type="button">Bu ay</button>
-            <button class="preset-btn" data-range="all" type="button">Hamısı</button>
+            <button class="preset-btn active" data-range="7" type="button" data-i18n="operations.preset7">Son 7 gün</button>
+            <button class="preset-btn" data-range="30" type="button" data-i18n="operations.preset30">Son 30 gün</button>
+            <button class="preset-btn" data-range="month" type="button" data-i18n="operations.presetMonth">Bu ay</button>
+            <button class="preset-btn" data-range="all" type="button" data-i18n="operations.presetAll">Hamısı</button>
           </div>
-
+ 
           <div class="history-filters">
             <label class="date-filter">
-              <span>Başlanğıc</span>
+              <span data-i18n="operations.startDate">Başlanğıc</span>
               <input id="history-start" type="date" value="{{ default_start }}">
             </label>
             <label class="date-filter">
-              <span>Bitmə</span>
+              <span data-i18n="operations.endDate">Bitmə</span>
               <input id="history-end" type="date" value="{{ default_end }}">
             </label>
             <label class="date-filter">
-              <span>Növ</span>
+              <span data-i18n="operations.kind">Növ</span>
               <select id="history-kind">
-                <option value="all">Hamısı</option>
-                <option value="sale">Satış</option>
-                <option value="daxilolma">Daxilolma</option>
-                <option value="itki">İtki</option>
+                <option value="all" data-i18n="operations.all">Hamısı</option>
+                <option value="sale" data-i18n="operations.sale">Satış</option>
+                <option value="daxilolma" data-i18n="operations.incoming">Daxilolma</option>
+                <option value="itki" data-i18n="operations.loss">İtki</option>
               </select>
             </label>
             <label class="date-filter history-search-filter">
-              <span>Məhsul</span>
-              <input id="history-product" type="search" placeholder="Ad axtar...">
+              <span data-i18n="operations.product">Məhsul</span>
+              <input id="history-product" type="search" placeholder="Ad axtar..." data-i18n-placeholder="operations.productSearchPlaceholder">
             </label>
-            <button id="history-reset-btn" class="btn secondary" type="button">Sıfırla</button>
+            <button id="history-reset-btn" class="btn secondary" type="button" data-i18n="operations.reset">Sıfırla</button>
           </div>
 
           <div class="table-wrap history-scroll">
             <table class="history-table">
               <thead>
                 <tr>
-                  <th>Tarix</th>
-                  <th>Məhsul</th>
-                  <th>Növ</th>
-                  <th class="text-right">Miqdar</th>
-                  <th class="text-right">Məbləğ</th>
+                  <th data-i18n="operations.dateColumn">Tarix</th>
+                  <th data-i18n="operations.productColumn">Məhsul</th>
+                  <th data-i18n="operations.kindColumn">Növ</th>
+                  <th class="text-right" data-i18n="operations.qtyColumn">Miqdar</th>
+                  <th class="text-right" data-i18n="operations.amountColumn">Məbləğ</th>
                 </tr>
               </thead>
               <tbody id="history-body">
@@ -227,6 +239,313 @@
     </div>
 
     <script>
+      const translations = {
+        az: {
+          'nav.products': 'Məhsullar',
+          'nav.operations': 'Əməliyyatlar',
+          'nav.reports': 'Hesabatlar',
+          'role.manager': 'Müdir',
+          'common.logout': 'Çıxış',
+          'operations.categories': 'Kateqoriyalar',
+          'operations.newCategory': 'Yeni kateqoriya',
+          'operations.addCategory': 'Kateqoriya əlavə et',
+          'operations.renameSelect': 'Dəyişdiriləcək kateqoriya',
+          'operations.renameName': 'Yeni ad',
+          'operations.renameButton': 'Dəyişdir',
+          'operations.deleteSelect': 'Silinəcək kateqoriya',
+          'operations.deleteCategory': 'Kateqoriyanı sil',
+          'operations.addProduct': 'Məhsul əlavə et',
+          'operations.productName': 'Məhsul adı',
+          'operations.category': 'Kateqoriya',
+          'operations.price': 'Qiymət',
+          'operations.stock': 'Stok',
+          'operations.imageUrl': 'Şəkil URL',
+          'operations.manageProducts': 'Məhsul idarəetməsi',
+          'operations.edit': 'Dəyişdir',
+          'operations.delete': 'Sil',
+          'operations.stockMovement': 'Daxilolma / İtki əlavə et',
+          'operations.product': 'Məhsul',
+          'operations.type': 'Növ',
+          'operations.quantity': 'Miqdar',
+          'operations.note': 'Qeyd',
+          'operations.add': 'Əlavə et',
+          'operations.history': 'Tarixçə',
+          'operations.historyCount': 'əməliyyat',
+          'operations.preset7': 'Son 7 gün',
+          'operations.preset30': 'Son 30 gün',
+          'operations.presetMonth': 'Bu ay',
+          'operations.presetAll': 'Hamısı',
+          'operations.startDate': 'Başlanğıc',
+          'operations.endDate': 'Bitmə',
+          'operations.kind': 'Növ',
+          'operations.all': 'Hamısı',
+          'operations.sale': 'Satış',
+          'operations.incoming': 'Daxilolma',
+          'operations.loss': 'İtki',
+          'operations.reset': 'Sıfırla',
+          'operations.dateColumn': 'Tarix',
+          'operations.productColumn': 'Məhsul',
+          'operations.kindColumn': 'Növ',
+          'operations.qtyColumn': 'Miqdar',
+          'operations.amountColumn': 'Məbləğ',
+          'operations.productSearchPlaceholder': 'Ad axtar...',
+          'operations.newCategoryPlaceholder': 'Məs. Fastfood',
+          'operations.renameNamePlaceholder': 'Yeni kateqoriya adı',
+          'operations.productNamePlaceholder': 'Məhsul adı',
+          'operations.imagePlaceholder': '(istəyə bağlı)',
+          'operations.quantityPlaceholder': 'Miqdar',
+          'operations.notePlaceholder': 'Qeyd (istəyə bağlı)',
+          'operations.alert.categoryRequired': 'Kateqoriya adı daxil edin.',
+          'operations.alert.categoryMissing': 'Kateqoriya və yeni ad daxil edin.',
+          'operations.alert.categorySelect': 'Silmək üçün kateqoriya seçin.',
+          'operations.alert.productRequired': 'Məhsul adı daxil edin.',
+          'operations.alert.stockMovementRequired': 'Məhsul və müsbət miqdar seçin',
+          'operations.alert.confirmDelete': 'Bu məhsulu silmək istədiyinizə əminsiniz?',
+          'operations.alert.confirmCategoryDelete': ' kateqoriyasını silmək istədiyinizə əminsiniz? Məhsullar "Other" kateqoriyasına keçirəcək.',
+          'operations.alert.success.categoryAdd': 'Kateqoriya əlavə edildi.',
+          'operations.alert.success.categoryRename': 'Kateqoriya dəyişdirildi.',
+          'operations.alert.success.categoryDelete': 'Kateqoriya silindi.',
+          'operations.alert.success.productAdd': 'Məhsul əlavə edildi.',
+          'operations.alert.success.stockAdd': 'Uğurla əlavə olundu.',
+          'operations.alert.processing': 'Əlavə edilir...'
+        },
+        en: {
+          'nav.products': 'Products',
+          'nav.operations': 'Operations',
+          'nav.reports': 'Reports',
+          'role.manager': 'Manager',
+          'common.logout': 'Logout',
+          'operations.categories': 'Categories',
+          'operations.newCategory': 'New category',
+          'operations.addCategory': 'Add category',
+          'operations.renameSelect': 'Category to rename',
+          'operations.renameName': 'New name',
+          'operations.renameButton': 'Rename',
+          'operations.deleteSelect': 'Category to delete',
+          'operations.deleteCategory': 'Delete category',
+          'operations.addProduct': 'Add product',
+          'operations.productName': 'Product name',
+          'operations.category': 'Category',
+          'operations.price': 'Price',
+          'operations.stock': 'Stock',
+          'operations.imageUrl': 'Image URL',
+          'operations.manageProducts': 'Manage products',
+          'operations.edit': 'Edit',
+          'operations.delete': 'Delete',
+          'operations.stockMovement': 'Add stock in / out',
+          'operations.product': 'Product',
+          'operations.type': 'Type',
+          'operations.quantity': 'Quantity',
+          'operations.note': 'Note',
+          'operations.add': 'Add',
+          'operations.history': 'History',
+          'operations.historyCount': 'entries',
+          'operations.preset7': 'Last 7 days',
+          'operations.preset30': 'Last 30 days',
+          'operations.presetMonth': 'This month',
+          'operations.presetAll': 'All',
+          'operations.startDate': 'Start',
+          'operations.endDate': 'End',
+          'operations.kind': 'Type',
+          'operations.all': 'All',
+          'operations.sale': 'Sale',
+          'operations.incoming': 'Incoming',
+          'operations.loss': 'Loss',
+          'operations.reset': 'Reset',
+          'operations.dateColumn': 'Date',
+          'operations.productColumn': 'Product',
+          'operations.kindColumn': 'Type',
+          'operations.qtyColumn': 'Qty',
+          'operations.amountColumn': 'Amount',
+          'operations.productSearchPlaceholder': 'Search by name...',
+          'operations.newCategoryPlaceholder': 'e.g. Fastfood',
+          'operations.renameNamePlaceholder': 'New category name',
+          'operations.productNamePlaceholder': 'Product name',
+          'operations.imagePlaceholder': '(optional)',
+          'operations.quantityPlaceholder': 'Qty',
+          'operations.notePlaceholder': 'Note (optional)',
+          'operations.alert.categoryRequired': 'Enter category name.',
+          'operations.alert.categoryMissing': 'Enter category and new name.',
+          'operations.alert.categorySelect': 'Select a category to delete.',
+          'operations.alert.productRequired': 'Enter a product name.',
+          'operations.alert.stockMovementRequired': 'Select a product and positive quantity.',
+          'operations.alert.confirmDelete': 'Are you sure you want to delete this product?',
+          'operations.alert.confirmCategoryDelete': ' are you sure you want to delete this category? Products will move to "Other".',
+          'operations.alert.success.categoryAdd': 'Category added.',
+          'operations.alert.success.categoryRename': 'Category renamed.',
+          'operations.alert.success.categoryDelete': 'Category deleted.',
+          'operations.alert.success.productAdd': 'Product added.',
+          'operations.alert.success.stockAdd': 'Added successfully.',
+          'operations.alert.processing': 'Adding...'
+        },
+        ru: {
+          'nav.products': 'Товары',
+          'nav.operations': 'Операции',
+          'nav.reports': 'Отчеты',
+          'role.manager': 'Менеджер',
+          'common.logout': 'Выход',
+          'operations.categories': 'Категории',
+          'operations.newCategory': 'Новая категория',
+          'operations.addCategory': 'Добавить категорию',
+          'operations.renameSelect': 'Категория для переименования',
+          'operations.renameName': 'Новое имя',
+          'operations.renameButton': 'Переименовать',
+          'operations.deleteSelect': 'Категория для удаления',
+          'operations.deleteCategory': 'Удалить категорию',
+          'operations.addProduct': 'Добавить товар',
+          'operations.productName': 'Название товара',
+          'operations.category': 'Категория',
+          'operations.price': 'Цена',
+          'operations.stock': 'Остаток',
+          'operations.imageUrl': 'URL изображения',
+          'operations.manageProducts': 'Управление товарами',
+          'operations.edit': 'Изменить',
+          'operations.delete': 'Удалить',
+          'operations.stockMovement': 'Добавить приход / расход',
+          'operations.product': 'Товар',
+          'operations.type': 'Тип',
+          'operations.quantity': 'Количество',
+          'operations.note': 'Примечание',
+          'operations.add': 'Добавить',
+          'operations.history': 'История',
+          'operations.historyCount': 'операций',
+          'operations.preset7': 'Последние 7 дней',
+          'operations.preset30': 'Последние 30 дней',
+          'operations.presetMonth': 'Этот месяц',
+          'operations.presetAll': 'Все',
+          'operations.startDate': 'Начало',
+          'operations.endDate': 'Конец',
+          'operations.kind': 'Тип',
+          'operations.all': 'Все',
+          'operations.sale': 'Продажа',
+          'operations.incoming': 'Поступление',
+          'operations.loss': 'Расход',
+          'operations.reset': 'Сброс',
+          'operations.dateColumn': 'Дата',
+          'operations.productColumn': 'Товар',
+          'operations.kindColumn': 'Тип',
+          'operations.qtyColumn': 'Кол-во',
+          'operations.amountColumn': 'Сумма',
+          'operations.productSearchPlaceholder': 'Поиск по названию...',
+          'operations.newCategoryPlaceholder': 'Напр. Fastfood',
+          'operations.renameNamePlaceholder': 'Новое имя категории',
+          'operations.productNamePlaceholder': 'Название товара',
+          'operations.imagePlaceholder': '(необязательно)',
+          'operations.quantityPlaceholder': 'Кол-во',
+          'operations.notePlaceholder': 'Примечание (необязательно)',
+          'operations.alert.categoryRequired': 'Введите название категории.',
+          'operations.alert.categoryMissing': 'Введите категорию и новое имя.',
+          'operations.alert.categorySelect': 'Выберите категорию для удаления.',
+          'operations.alert.productRequired': 'Введите название товара.',
+          'operations.alert.stockMovementRequired': 'Выберите товар и положительное количество.',
+          'operations.alert.confirmDelete': 'Вы уверены, что хотите удалить этот товар?',
+          'operations.alert.confirmCategoryDelete': ' вы уверены, что хотите удалить эту категорию? Товары будут перенесены в "Other".',
+          'operations.alert.success.categoryAdd': 'Категория добавлена.',
+          'operations.alert.success.categoryRename': 'Категория переименована.',
+          'operations.alert.success.categoryDelete': 'Категория удалена.',
+          'operations.alert.success.productAdd': 'Товар добавлен.',
+          'operations.alert.success.stockAdd': 'Успешно добавлено.',
+          'operations.alert.processing': 'Добавление...'
+        },
+        tr: {
+          'nav.products': 'Ürünler',
+          'nav.operations': 'İşlemler',
+          'nav.reports': 'Raporlar',
+          'role.manager': 'Yönetici',
+          'common.logout': 'Çıkış',
+          'operations.categories': 'Kategoriler',
+          'operations.newCategory': 'Yeni kategori',
+          'operations.addCategory': 'Kategori ekle',
+          'operations.renameSelect': 'Yeniden adlandırılacak kategori',
+          'operations.renameName': 'Yeni ad',
+          'operations.renameButton': 'Yeniden adlandır',
+          'operations.deleteSelect': 'Silinecek kategori',
+          'operations.deleteCategory': 'Kategoriyi sil',
+          'operations.addProduct': 'Ürün ekle',
+          'operations.productName': 'Ürün adı',
+          'operations.category': 'Kategori',
+          'operations.price': 'Fiyat',
+          'operations.stock': 'Stok',
+          'operations.imageUrl': 'Görsel URL',
+          'operations.manageProducts': 'Ürün yönetimi',
+          'operations.edit': 'Düzenle',
+          'operations.delete': 'Sil',
+          'operations.stockMovement': 'Giriş / Çıkış ekle',
+          'operations.product': 'Ürün',
+          'operations.type': 'Tür',
+          'operations.quantity': 'Miktar',
+          'operations.note': 'Not',
+          'operations.add': 'Ekle',
+          'operations.history': 'Geçmiş',
+          'operations.historyCount': 'işlem',
+          'operations.preset7': 'Son 7 gün',
+          'operations.preset30': 'Son 30 gün',
+          'operations.presetMonth': 'Bu ay',
+          'operations.presetAll': 'Tümü',
+          'operations.startDate': 'Başlangıç',
+          'operations.endDate': 'Bitiş',
+          'operations.kind': 'Tür',
+          'operations.all': 'Tümü',
+          'operations.sale': 'Satış',
+          'operations.incoming': 'Giriş',
+          'operations.loss': 'Çıkış',
+          'operations.reset': 'Sıfırla',
+          'operations.dateColumn': 'Tarih',
+          'operations.productColumn': 'Ürün',
+          'operations.kindColumn': 'Tür',
+          'operations.qtyColumn': 'Miktar',
+          'operations.amountColumn': 'Tutar',
+          'operations.productSearchPlaceholder': 'Ada göre ara...',
+          'operations.newCategoryPlaceholder': 'Örn. Fastfood',
+          'operations.renameNamePlaceholder': 'Yeni kategori adı',
+          'operations.productNamePlaceholder': 'Ürün adı',
+          'operations.imagePlaceholder': '(opsiyonel)',
+          'operations.quantityPlaceholder': 'Miktar',
+          'operations.notePlaceholder': 'Not (opsiyonel)',
+          'operations.alert.categoryRequired': 'Kategori adını girin.',
+          'operations.alert.categoryMissing': 'Kategori ve yeni adı girin.',
+          'operations.alert.categorySelect': 'Silmek için bir kategori seçin.',
+          'operations.alert.productRequired': 'Ürün adını girin.',
+          'operations.alert.stockMovementRequired': 'Ürün ve pozitif miktar seçin.',
+          'operations.alert.confirmDelete': 'Bu ürünü silmek istediğinize emin misiniz?',
+          'operations.alert.confirmCategoryDelete': ' kategorisini silmek istediğinize emin misiniz? Ürünler "Other" kategorisine taşınacak.',
+          'operations.alert.success.categoryAdd': 'Kategori eklendi.',
+          'operations.alert.success.categoryRename': 'Kategori yeniden adlandırıldı.',
+          'operations.alert.success.categoryDelete': 'Kategori silindi.',
+          'operations.alert.success.productAdd': 'Ürün eklendi.',
+          'operations.alert.success.stockAdd': 'Başarıyla eklendi.',
+          'operations.alert.processing': 'Ekleniyor...'
+        }
+      };
+
+      let currentLang = localStorage.getItem('pos_lang') || 'az';
+
+      function t(key) {
+        const dict = translations[currentLang] || translations.az;
+        return dict[key] !== undefined ? dict[key] : key;
+      }
+
+      function applyLanguage(lang) {
+        currentLang = lang in translations ? lang : 'az';
+        const dict = translations[currentLang];
+        document.querySelectorAll('[data-i18n]').forEach((el) => {
+          if (dict[el.dataset.i18n] !== undefined) {
+            el.textContent = dict[el.dataset.i18n];
+          }
+        });
+        document.querySelectorAll('[data-i18n-placeholder]').forEach((el) => {
+          if (dict[el.dataset.i18nPlaceholder] !== undefined) {
+            el.placeholder = dict[el.dataset.i18nPlaceholder];
+          }
+        });
+        const langSelect = document.getElementById('operations-lang-select');
+        if (langSelect) {
+          langSelect.value = currentLang;
+        }
+        localStorage.setItem('pos_lang', currentLang);
+        document.documentElement.lang = currentLang;
+      }
+
       function parseHistoryDate(value) {
         if (!value) return null;
         const normalized = String(value).replace(' ', 'T');
@@ -355,17 +674,19 @@
         if (startInput) startInput.dataset.defaultValue = startInput.value;
         if (endInput) endInput.dataset.defaultValue = endInput.value;
         applyHistoryFilters();
+        syncCategorySelectors();
+        applyLanguage(currentLang);
       });
 
       document.getElementById('add-category-btn').addEventListener('click', async ()=>{
         const name = document.getElementById('new-category-name').value.trim();
         const msg = document.getElementById('category-msg');
-        if(!name){ msg.textContent='Kateqoriya adı daxil edin.'; return; }
+        if(!name){ msg.textContent = t('operations.alert.categoryRequired'); return; }
         try {
           const res = await fetch('/api/categories', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({name})});
           const data = await res.json();
-          if(!res.ok) throw new Error(data.message || 'Kateqoriya əlavə edilmədi.');
-          msg.textContent='Kateqoriya əlavə edildi.';
+          if(!res.ok) throw new Error(data.message || 'Category add failed.');
+          msg.textContent = t('operations.alert.success.categoryAdd');
           document.getElementById('new-category-name').value='';
           location.reload();
         } catch(e){ msg.textContent='Xəta: '+e.message; }
@@ -375,12 +696,12 @@
         const oldName = document.getElementById('rename-category-select').value;
         const newName = document.getElementById('rename-category-name').value.trim();
         const msg = document.getElementById('category-msg');
-        if(!oldName || !newName){ msg.textContent='Kateqoriya və yeni ad daxil edin.'; return; }
+        if(!oldName || !newName){ msg.textContent = t('operations.alert.categoryMissing'); return; }
         try {
           const res = await fetch(`/api/categories/${encodeURIComponent(oldName)}`, {method:'PUT', headers:{'Content-Type':'application/json'}, body:JSON.stringify({new_name:newName})});
           const data = await res.json();
-          if(!res.ok) throw new Error(data.message || 'Kateqoriya dəyişdirilmədi.');
-          msg.textContent='Kateqoriya dəyişdirildi.';
+          if(!res.ok) throw new Error(data.message || 'Category rename failed.');
+          msg.textContent = t('operations.alert.success.categoryRename');
           document.getElementById('rename-category-name').value='';
           location.reload();
         } catch(e){ msg.textContent='Xəta: '+e.message; }
@@ -389,23 +710,23 @@
       document.getElementById('delete-category-btn').addEventListener('click', async ()=>{
         const category = document.getElementById('delete-category-select').value;
         const msg = document.getElementById('category-msg');
-        if(!category){ msg.textContent='Silmək üçün kateqoriya seçin.'; return; }
-        if(!confirm(`${category} kateqoriyasını silmək istədiyinizə əminsiniz? Məhsullar "Other" kateqoriyasına keçirəcək.`)) return;
+        if(!category){ msg.textContent = t('operations.alert.categorySelect'); return; }
+        if(!confirm(`${category}${t('operations.alert.confirmCategoryDelete')}`)) return;
         try {
           const res = await fetch(`/api/categories/${encodeURIComponent(category)}`, {method:'DELETE'});
           const data = await res.json();
-          if(!res.ok) throw new Error(data.message || 'Kateqoriya silinmədi.');
-          msg.textContent='Kateqoriya silindi.';
+          if(!res.ok) throw new Error(data.message || 'Category delete failed.');
+          msg.textContent = t('operations.alert.success.categoryDelete');
           location.reload();
         } catch(e){ msg.textContent='Xəta: '+e.message; }
       });
 
       async function deleteProduct(productId) {
-        if(!confirm('Bu məhsulu silmək istədiyinizə əminsiniz?')) return;
+        if(!confirm(t('operations.alert.confirmDelete'))) return;
         try {
           const res = await fetch(`/api/products/${productId}`, {method:'DELETE'});
           const data = await res.json();
-          if(!res.ok) throw new Error(data.message || 'Məhsul silinmədi.');
+          if(!res.ok) throw new Error(data.message || 'Product delete failed.');
           location.reload();
         } catch(e){ alert(e.message); }
       }
@@ -437,7 +758,7 @@
             body: JSON.stringify({ name: name.trim(), category: (category || 'Other').trim() || 'Other', price: Number(price), stock: Number(stock), image_url: image_url.trim() || null })
           });
           const data = await res.json();
-          if(!res.ok) throw new Error(data.message || 'Məhsul yenilənmədi.');
+          if(!res.ok) throw new Error(data.message || 'Product update failed.');
           location.reload();
         } catch(e){ alert(e.message); }
       }
@@ -449,12 +770,12 @@
         const stock = Number(document.getElementById('new-product-stock').value || 0);
         const image_url = document.getElementById('new-product-image').value.trim();
         const msg = document.getElementById('product-msg');
-        if(!name){ msg.textContent='Məhsul adı daxil edin.'; return; }
+        if(!name){ msg.textContent = t('operations.alert.productRequired'); return; }
         try {
           const res = await fetch('/add_product', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({name, category, price, stock, image_url})});
           const data = await res.json();
-          if(!res.ok) throw new Error(data.message || 'Məhsul əlavə edilmədi.');
-          msg.textContent='Məhsul əlavə edildi.';
+          if(!res.ok) throw new Error(data.message || 'Product add failed.');
+          msg.textContent = t('operations.alert.success.productAdd');
           document.getElementById('new-product-name').value='';
           document.getElementById('new-product-price').value='0';
           document.getElementById('new-product-stock').value='0';
@@ -485,20 +806,21 @@
         const quantity = Number(document.getElementById('mov-qty').value || 0);
         const note = document.getElementById('mov-note').value || '';
         const msg = document.getElementById('mov-msg');
-        if(!product_id || quantity <= 0){ msg.textContent='Məhsul və müsbət miqdar seçin'; return; }
-        msg.textContent='Əlavə edilir...';
+        if(!product_id || quantity <= 0){ msg.textContent = t('operations.alert.stockMovementRequired'); return; }
+        msg.textContent = t('operations.alert.processing');
         try{
           const res = await fetch('/operations/add',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({product_id, type, quantity, note})});
           const data = await res.json();
-          if(!res.ok) throw new Error(data.message||'Xəta');
-          msg.textContent='Uğurla əlavə olundu.';
+          if(!res.ok) throw new Error(data.message||'Error');
+          msg.textContent = t('operations.alert.success.stockAdd');
           setTimeout(()=>location.reload(),500);
         }catch(e){ msg.textContent='Xəta: '+e.message; }
       });
 
-      document.addEventListener('DOMContentLoaded', ()=>{
-        syncCategorySelectors();
-      });
+      const languageSelect = document.getElementById('operations-lang-select');
+      if (languageSelect) {
+        languageSelect.addEventListener('change', (event) => applyLanguage(event.target.value));
+      }
     </script>
   </body>
 </html>

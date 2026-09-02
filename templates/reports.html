@@ -11,18 +11,29 @@
   <body>
     <div class="page-header">
       <div class="page-title">
-        <h1>Hesabatlar</h1>
-        <p class="page-subtitle">Satış məlumatlarını tarix aralığına görə analiz et</p>
+        <h1 data-i18n="reports.title">Hesabatlar</h1>
+        <p class="page-subtitle" data-i18n="reports.subtitle">Satış məlumatlarını tarix aralığına görə analiz et</p>
       </div>
       <div class="page-actions">
+        <div class="lang-switcher" aria-label="Dil seçimi">
+          <label class="lang-select-wrap" for="reports-lang-select">
+            <span class="sr-only">Dil</span>
+            <select id="reports-lang-select" class="lang-select" aria-label="Dil seçimi">
+              <option value="az">Aze</option>
+              <option value="en">Eng</option>
+              <option value="ru">Rus</option>
+              <option value="tr">Tur</option>
+            </select>
+          </label>
+        </div>
         <nav class="page-nav">
-          <a href="/">Məhsullar</a>
-          <a href="/operations">Əməliyyatlar</a>
-          <a href="/reports" class="active">Hesabatlar</a>
+          <a href="/" data-i18n="nav.products">Məhsullar</a>
+          <a href="/operations" data-i18n="nav.operations">Əməliyyatlar</a>
+          <a href="/reports" class="active" data-i18n="nav.reports">Hesabatlar</a>
         </nav>
         <div class="user-chip">
-          Müdir
-          <a href="{{ url_for('logout') }}" class="logout-link">Çıxış</a>
+          <span data-i18n="role.manager">Müdir</span>
+          <a href="{{ url_for('logout') }}" class="logout-link" data-i18n="common.logout">Çıxış</a>
         </div>
       </div>
     </div>
@@ -30,46 +41,146 @@
     <div class="container reports-container">
       <div class="reports-top">
         <label class="date-filter">
-          Başlanğıc tarix
+          <span data-i18n="reports.startDate">Başlanğıc tarix</span>
           <input type="date" id="start-date" value="{{ default_start }}">
         </label>
         <label class="date-filter">
-          Son tarix
+          <span data-i18n="reports.endDate">Son tarix</span>
           <input type="date" id="end-date" value="{{ default_end }}">
         </label>
-        <button id="filter-btn" class="btn primary">Filtrlə</button>
+        <button id="filter-btn" class="btn primary" data-i18n="reports.filter">Filtrlə</button>
       </div>
 
       <div class="report-cards">
         <div class="report-card">
-          <h4>Ən çox satılan məhsul</h4>
+          <h4 data-i18n="reports.mostSold">Ən çox satılan məhsul</h4>
           <div id="most-sold" class="report-value">-</div>
         </div>
         <div class="report-card">
-          <h4>Ən az satılan məhsul</h4>
+          <h4 data-i18n="reports.leastSold">Ən az satılan məhsul</h4>
           <div id="least-sold" class="report-value">-</div>
         </div>
       </div>
 
       <div class="chart-grid">
         <section class="chart-card">
-          <h4>Kateqoriya üzrə satış payı</h4>
-          <canvas id="pieChart"></canvas>
+          <h4 data-i18n="reports.categoryShare">Kateqoriya üzrə satış payı</h4>
+          <div class="chart-wrap"><canvas id="pieChart"></canvas></div>
         </section>
         <section class="chart-card">
-          <h4>Gün üzrə ümumi satış (AZN)</h4>
-          <canvas id="barDaily"></canvas>
+          <h4 data-i18n="reports.dailySales">Gün üzrə ümumi satış (AZN)</h4>
+          <div class="chart-wrap"><canvas id="barDaily"></canvas></div>
+        </section>
+        <section class="chart-card">
+          <h4 data-i18n="reports.top5">Top 5 məhsul (ədəd)</h4>
+          <div class="chart-wrap"><canvas id="barTop5"></canvas></div>
         </section>
       </div>
-
-      <section class="chart-card chart-fullwidth">
-        <h4>Top 5 ən çox satılan məhsul (ədəd)</h4>
-        <canvas id="barTop5"></canvas>
-      </section>
     </div>
 
     <script>
+      const translations = {
+        az: {
+          'nav.products': 'Məhsullar',
+          'nav.operations': 'Əməliyyatlar',
+          'nav.reports': 'Hesabatlar',
+          'role.manager': 'Müdir',
+          'common.logout': 'Çıxış',
+          'reports.title': 'Hesabatlar',
+          'reports.subtitle': 'Satış məlumatlarını tarix aralığına görə analiz et',
+          'reports.startDate': 'Başlanğıc tarix',
+          'reports.endDate': 'Son tarix',
+          'reports.filter': 'Filtrlə',
+          'reports.mostSold': 'Ən çox satılan məhsul',
+          'reports.leastSold': 'Ən az satılan məhsul',
+          'reports.categoryShare': 'Kateqoriya üzrə satış payı',
+          'reports.dailySales': 'Gün üzrə ümumi satış (AZN)',
+          'reports.top5': 'Top 5 məhsul (ədəd)',
+          'reports.noData': 'Məlumat yoxdur',
+          'reports.units': 'əd.'
+        },
+        en: {
+          'nav.products': 'Products',
+          'nav.operations': 'Operations',
+          'nav.reports': 'Reports',
+          'role.manager': 'Manager',
+          'common.logout': 'Logout',
+          'reports.title': 'Reports',
+          'reports.subtitle': 'Analyze sales over a date range',
+          'reports.startDate': 'Start date',
+          'reports.endDate': 'End date',
+          'reports.filter': 'Filter',
+          'reports.mostSold': 'Best-selling product',
+          'reports.leastSold': 'Lowest-selling product',
+          'reports.categoryShare': 'Sales share by category',
+          'reports.dailySales': 'Daily total sales (AZN)',
+          'reports.top5': 'Top 5 products (qty)',
+          'reports.noData': 'No data',
+          'reports.units': 'pcs.'
+        },
+        ru: {
+          'nav.products': 'Товары',
+          'nav.operations': 'Операции',
+          'nav.reports': 'Отчеты',
+          'role.manager': 'Менеджер',
+          'common.logout': 'Выход',
+          'reports.title': 'Отчеты',
+          'reports.subtitle': 'Анализ продаж по диапазону дат',
+          'reports.startDate': 'Дата начала',
+          'reports.endDate': 'Дата окончания',
+          'reports.filter': 'Фильтр',
+          'reports.mostSold': 'Самый продаваемый товар',
+          'reports.leastSold': 'Наименее продаваемый товар',
+          'reports.categoryShare': 'Доля продаж по категориям',
+          'reports.dailySales': 'Общие продажи по дням (AZN)',
+          'reports.top5': 'Топ 5 товаров (шт.)',
+          'reports.noData': 'Нет данных',
+          'reports.units': 'шт.'
+        },
+        tr: {
+          'nav.products': 'Ürünler',
+          'nav.operations': 'İşlemler',
+          'nav.reports': 'Raporlar',
+          'role.manager': 'Yönetici',
+          'common.logout': 'Çıkış',
+          'reports.title': 'Raporlar',
+          'reports.subtitle': 'Satışları tarih aralığına göre analiz et',
+          'reports.startDate': 'Başlangıç tarihi',
+          'reports.endDate': 'Bitiş tarihi',
+          'reports.filter': 'Filtrele',
+          'reports.mostSold': 'En çok satılan ürün',
+          'reports.leastSold': 'En az satılan ürün',
+          'reports.categoryShare': 'Kategoriye göre satış payı',
+          'reports.dailySales': 'Günlük toplam satış (AZN)',
+          'reports.top5': 'Top 5 ürün (adet)',
+          'reports.noData': 'Veri yok',
+          'reports.units': 'adet'
+        }
+      };
+
       let pieChart, barDaily, barTop5;
+      let currentLang = localStorage.getItem('pos_lang') || 'az';
+
+      function applyLanguage(lang) {
+        currentLang = lang in translations ? lang : 'az';
+        const dict = translations[currentLang];
+        document.querySelectorAll('[data-i18n]').forEach((el) => {
+          if (dict[el.dataset.i18n] !== undefined) {
+            el.textContent = dict[el.dataset.i18n];
+          }
+        });
+        const langSelect = document.getElementById('reports-lang-select');
+        if (langSelect) {
+          langSelect.value = currentLang;
+        }
+        document.documentElement.lang = currentLang;
+        localStorage.setItem('pos_lang', currentLang);
+      }
+
+      const languageSelect = document.getElementById('reports-lang-select');
+      if (languageSelect) {
+        languageSelect.addEventListener('change', (event) => applyLanguage(event.target.value));
+      }
 
       async function fetchReports(start, end){
         const res = await fetch('/api/reports',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({start_date:start,end_date:end})});
@@ -78,8 +189,9 @@
 
       function renderMostLeast(data){
         const most = data.most_sold; const least = data.least_sold;
-        document.getElementById('most-sold').textContent = most ? `${most.name} — ${most.total_qty} əd.` : 'Məlumat yoxdur';
-        document.getElementById('least-sold').textContent = least ? `${least.name} — ${least.total_qty} əd.` : 'Məlumat yoxdur';
+        const dict = translations[currentLang];
+        document.getElementById('most-sold').textContent = most ? `${most.name} — ${most.total_qty} ${dict['reports.units']}` : dict['reports.noData'];
+        document.getElementById('least-sold').textContent = least ? `${least.name} — ${least.total_qty} ${dict['reports.units']}` : dict['reports.noData'];
       }
 
       function renderPie(data){
@@ -87,7 +199,16 @@
         const labels = data.category_breakdown.map(r=>r.category);
         const vals = data.category_breakdown.map(r=>r.total_amount);
         if(pieChart) pieChart.destroy();
-        pieChart = new Chart(ctx, { type:'pie', data:{labels, datasets:[{data:vals, backgroundColor:[ '#ff7b2d','#36a2eb','#4bc0c0','#9966ff','#ff6384' ] }] }, options:{responsive:true} });
+        pieChart = new Chart(ctx, {
+          type:'pie',
+          data:{labels, datasets:[{data:vals, backgroundColor:['#1d8ea8','#36a2eb','#4bc0c0','#9966ff','#ff6384','#f4b942']} ] },
+          options:{
+            responsive:true,
+            maintainAspectRatio:false,
+            plugins:{legend:{position:'bottom', labels:{boxWidth:10, usePointStyle:true, font:{size:10}}}},
+            layout:{padding:{top:8,right:8,bottom:6,left:8}}
+          }
+        });
       }
 
       function renderDaily(data){
@@ -95,7 +216,19 @@
         const labels = data.daily_totals.map(r=>r.date);
         const vals = data.daily_totals.map(r=>r.total);
         if(barDaily) barDaily.destroy();
-        barDaily = new Chart(ctx, { type:'bar', data:{labels, datasets:[{label:'AZN', data:vals, backgroundColor:'#36a2eb'}]}, options:{responsive:true, scales:{x:{ticks:{maxRotation:45,minRotation:0}}}} });
+        barDaily = new Chart(ctx, {
+          type:'bar',
+          data:{labels, datasets:[{label:'AZN', data:vals, backgroundColor:'#36a2eb', borderRadius:6}]},
+          options:{
+            responsive:true,
+            maintainAspectRatio:false,
+            plugins:{legend:{display:false}},
+            scales:{
+              x:{ticks:{maxRotation:0,minRotation:0,font:{size:9}}, grid:{display:false}},
+              y:{ticks:{font:{size:9}}, grid:{color:'rgba(148,163,184,0.18)'}}
+            }
+          }
+        });
       }
 
       function renderTop5(data){
@@ -103,14 +236,27 @@
         const labels = data.top5_products.map(r=>r.name);
         const vals = data.top5_products.map(r=>r.total_qty);
         if(barTop5) barTop5.destroy();
-        barTop5 = new Chart(ctx, { type:'bar', data:{labels, datasets:[{label:'əd.', data:vals, backgroundColor:'#ff7b2d'}]}, options:{responsive:true, indexAxis:'y'} });
+        barTop5 = new Chart(ctx, {
+          type:'bar',
+          data:{labels, datasets:[{label:translations[currentLang]['reports.units'], data:vals, backgroundColor:'#ff7b2d', borderRadius:6}]},
+          options:{
+            responsive:true,
+            maintainAspectRatio:false,
+            indexAxis:'y',
+            plugins:{legend:{display:false}},
+            scales:{
+              x:{ticks:{font:{size:9}}, grid:{color:'rgba(148,163,184,0.18)'}},
+              y:{ticks:{font:{size:9}}, grid:{display:false}}
+            }
+          }
+        });
       }
 
       async function loadAndRender(){
         const start = document.getElementById('start-date').value;
         const end = document.getElementById('end-date').value;
         const res = await fetchReports(start,end);
-        if(!res.success){ alert(res.message||'Xəta'); return; }
+        if(!res.success){ alert(res.message || 'Xəta'); return; }
         renderMostLeast(res);
         renderPie(res);
         renderDaily(res);
@@ -118,9 +264,10 @@
       }
 
       document.getElementById('filter-btn').addEventListener('click', ()=>{ loadAndRender(); });
-
-      // initial load
-      document.addEventListener('DOMContentLoaded', ()=>{ loadAndRender(); });
+      document.addEventListener('DOMContentLoaded', ()=>{
+        applyLanguage(currentLang);
+        loadAndRender();
+      });
     </script>
   </body>
 </html>
