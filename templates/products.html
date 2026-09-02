@@ -23,26 +23,15 @@
     <div class="layout-row">
       <main>
         <section class="section-filters">
+          <div class="search-panel">
+            <input id="product-search" type="text" placeholder="Məhsul adını yazın..." aria-label="Məhsul axtar">
+          </div>
           <div class="filters-flex">
             <button class="btn filter-btn" data-category="All" data-base="Bütün məhsullar" onclick="filterCategory('All')">Bütün məhsullar</button>
             {% for cat in categories %}
               <button class="btn filter-btn" data-category="{{ cat }}" data-base="{{ cat }}" onclick="filterCategory('{{ cat }}')">{{ cat }}</button>
             {% endfor %}
             <div class="filter-count-label">Məhsullar: {{ products|length }}</div>
-          </div>
-
-          <!-- Add product form (open for adding new items) -->
-          <div class="new-product-form-container">
-            <h3>Yeni məhsul əlavə et</h3>
-            <div class="new-product-form-inputs">
-              <input id="new-name" placeholder="Məhsul adı" class="new-product-input">
-              <input id="new-category" placeholder="Kateqoriya" value="Other" class="new-product-input short">
-              <input id="new-price" placeholder="Qiymət" type="number" step="0.01" class="new-product-input small">
-              <input id="new-stock" placeholder="Stok" type="number" value="10" class="new-product-input xsmall">
-              <input id="new-image" placeholder="Image URL (optional)" class="new-product-input long">
-              <button class="add-btn" type="button" onclick="addProduct()">Əlavə et</button>
-            </div>
-            <div id="add-product-msg" class="add-product-msg"></div>
           </div>
         </section>
 
@@ -85,42 +74,39 @@
     <script>
       // App JS - improved and organized
       const cart = [];
+      let activeCategory = 'All';
+      let searchTerm = '';
+
+      function applyProductFilters() {
+        const cards = document.querySelectorAll('.products-grid .product-card');
+        let visibleCount = 0;
+
+        cards.forEach(card => {
+          const categoryMatches = activeCategory === 'All' || card.dataset.category === activeCategory;
+          const productName = (card.querySelector('.product-name-text')?.textContent || '').toLowerCase();
+          const searchMatches = !searchTerm || productName.includes(searchTerm.toLowerCase());
+          const shouldShow = categoryMatches && searchMatches;
+          card.style.display = shouldShow ? '' : 'none';
+          if (shouldShow) visibleCount += 1;
+        });
+
+        updateVisibleCount(visibleCount);
+      }
 
       function filterCategory(cat) {
-        const cards = document.querySelectorAll('.products-grid .product-card');
-        cards.forEach(c => {
-          if (cat === 'All' || c.dataset.category === cat) c.style.display = '';
-          else c.style.display = 'none';
-        });
-        // highlight active button
+        activeCategory = cat;
         document.querySelectorAll('.filters-flex .btn').forEach(b => b.classList.remove('filter-active'));
         const buttons = Array.from(document.querySelectorAll('.filters-flex .filter-btn'));
         const active = buttons.find(b => b.dataset.category === cat);
         if (active) active.classList.add('filter-active');
-
-        updateVisibleCount();
+        applyProductFilters();
       }
 
-      function updateCategoryCounts() {
-        const cards = Array.from(document.querySelectorAll('.products-grid .product-card'));
-        const counts = { All: cards.length };
-        cards.forEach(card => {
-          const cat = card.dataset.category || 'Other';
-          counts[cat] = (counts[cat] || 0) + 1;
-        });
-        document.querySelectorAll('.filters-flex .filter-btn').forEach(button => {
-          const base = button.dataset.base || button.dataset.category;
-          const count = counts[button.dataset.category] || 0;
-          button.textContent = `${base} (${count})`;
-        });
-      }
-
-      function updateVisibleCount() {
-        const visible = Array.from(document.querySelectorAll('.products-grid .product-card')).filter(card => card.style.display !== 'none').length;
+      function updateVisibleCount(visibleOverride = null) {
         const countLabel = document.querySelector('.filter-count-label');
-        if (countLabel) {
-          countLabel.textContent = `Məhsullar: ${visible}`;
-        }
+        if (!countLabel) return;
+        const visible = visibleOverride ?? Array.from(document.querySelectorAll('.products-grid .product-card')).filter(card => card.style.display !== 'none').length;
+        countLabel.textContent = `Məhsullar: ${visible}`;
       }
 
       function addToCart(button) {
@@ -140,26 +126,6 @@
  
        if (existing) existing.quantity += quantity; else cart.push({ id, name, price, quantity });
        renderCart();
-        }
-
-        // Add product via API
-        async function addProduct(){
-       const name = document.getElementById('new-name').value.trim();
-       const category = document.getElementById('new-category').value.trim() || 'Other';
-       const price = document.getElementById('new-price').value.trim();
-       const stock = document.getElementById('new-stock').value.trim();
-       const image_url = document.getElementById('new-image').value.trim();
-       const msg = document.getElementById('add-product-msg');
-       if(!name || !price){ msg.textContent='Zəhmət olmasa ad və qiymət daxil edin.'; return; }
-       msg.textContent='Məhsul əlavə edilir...';
-       try{
-         const res = await fetch('/add_product',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name,category,price,stock,image_url})});
-         const data = await res.json();
-         if(!res.ok) throw new Error(data.message||'Xəta');
-         msg.textContent='Məhsul əlavə edildi.';
-         // reload to show new product in grid (simpler than DOM insertion)
-         setTimeout(()=>location.reload(),700);
-       }catch(e){ msg.textContent='Əlavə zamanı xəta: '+e.message; }
         }
 
       function removeFromCart(index) { cart.splice(index,1); renderCart(); }
@@ -232,7 +198,16 @@
       }
 
       // init default filter
-      document.addEventListener('DOMContentLoaded',()=>{ filterCategory('All'); });
+      document.addEventListener('DOMContentLoaded',()=>{
+        const searchInput = document.getElementById('product-search');
+        if (searchInput) {
+          searchInput.addEventListener('input', (event) => {
+            searchTerm = event.target.value.trim();
+            applyProductFilters();
+          });
+        }
+        filterCategory('All');
+      });
     </script>
   </body>
 </html>

@@ -324,6 +324,114 @@ def _create_tables_sqlite(conn):
         cur.close()
 
 
+def _sync_categories(conn, database_url):
+    """Ensure category metadata stays aligned with product data."""
+    if database_url:
+        cur = conn.cursor()
+        try:
+            cur.execute(
+                """
+                CREATE TABLE IF NOT EXISTS categories (
+                    id SERIAL PRIMARY KEY,
+                    name VARCHAR(100) NOT NULL UNIQUE
+                )
+                """
+            )
+            cur.execute("SELECT DISTINCT category FROM products WHERE category IS NOT NULL")
+            existing = {row[0] for row in cur.fetchall() if row and row[0]}
+            for name in sorted(existing):
+                cur.execute(
+                    "INSERT INTO categories (name) VALUES (%s) ON CONFLICT (name) DO NOTHING",
+                    (name,),
+                )
+            cur.execute(
+                "SELECT name FROM categories WHERE name NOT IN (SELECT DISTINCT category FROM products WHERE category IS NOT NULL)"
+            )
+            orphan_names = [row[0] for row in cur.fetchall()]
+            for name in orphan_names:
+                cur.execute("DELETE FROM categories WHERE name = %s", (name,))
+            conn.commit()
+        finally:
+            cur.close()
+    else:
+        cur = conn.cursor()
+        try:
+            cur.execute(
+                """
+                CREATE TABLE IF NOT EXISTS categories (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    name TEXT NOT NULL UNIQUE
+                )
+                """
+            )
+            cur.execute("SELECT DISTINCT category FROM products WHERE category IS NOT NULL")
+            existing = {row[0] for row in cur.fetchall() if row and row[0]}
+            for name in sorted(existing):
+                cur.execute(
+                    "INSERT OR IGNORE INTO categories (name) VALUES (?)",
+                    (name,),
+                )
+            cur.execute(
+                "SELECT name FROM categories WHERE name NOT IN (SELECT DISTINCT category FROM products WHERE category IS NOT NULL)"
+            )
+            orphan_names = [row[0] for row in cur.fetchall()]
+            for name in orphan_names:
+                cur.execute("DELETE FROM categories WHERE name = ?", (name,))
+            conn.commit()
+        finally:
+            cur.close()
+
+
+def _ensure_category(conn, database_url, category_name):
+    """Create a category record if it does not already exist."""
+    if category_name is None:
+        return
+    name = str(category_name).strip() or 'Other'
+    if database_url:
+        cur = conn.cursor()
+        try:
+            cur.execute(
+                "INSERT INTO categories (name) VALUES (%s) ON CONFLICT (name) DO NOTHING",
+                (name,),
+            )
+            conn.commit()
+        finally:
+            cur.close()
+    else:
+        cur = conn.cursor()
+        try:
+            cur.execute("INSERT OR IGNORE INTO categories (name) VALUES (?)", (name,))
+            conn.commit()
+        finally:
+            cur.close()
+
+
+def _get_categories(conn, database_url):
+    """Return sorted category names from the category table or derived product data."""
+    if database_url:
+        cur = conn.cursor()
+        try:
+            cur.execute("SELECT name FROM categories ORDER BY name")
+            categories = [row[0] for row in cur.fetchall() if row and row[0]]
+            if categories:
+                return categories
+            cur.execute("SELECT DISTINCT category FROM products WHERE category IS NOT NULL ORDER BY category")
+            return [row[0] for row in cur.fetchall() if row and row[0]]
+        finally:
+            cur.close()
+
+    cur = conn.cursor()
+    try:
+        cur.execute("SELECT name FROM categories ORDER BY name")
+        categories = [row[0] for row in cur.fetchall() if row and row[0]]
+        if categories:
+            return categories
+        cur.execute("SELECT DISTINCT category FROM products WHERE category IS NOT NULL ORDER BY category")
+        return [row[0] for row in cur.fetchall() if row and row[0]]
+    finally:
+        cur.close()
+
+
 def init_db():
     """Initialize database tables for products, sales and sale_items.
 
@@ -336,6 +444,7 @@ def init_db():
         _create_tables_postgres(conn)
     else:
         _create_tables_sqlite(conn)
+    _sync_categories(conn, database_url)
 
 
 @app.route("/")
@@ -353,27 +462,21 @@ def products_page():
         try:
             cur.execute("SELECT id, name, category, price, stock, image_url FROM products ORDER BY id")
             products = cur.fetchall()
-            cur.execute("SELECT DISTINCT category FROM products ORDER BY category")
-            categories = [r[0] for r in cur.fetchall()]
         finally:
             cur.close()
     else:
         products_sql = (
-            "SELECT id, name, category, price, stock "
+            "SELECT id, name, category, price, stock, image_url "
             "FROM products ORDER BY id"
         )
         cur = conn.cursor()
         try:
             cur.execute(products_sql)
             products = cur.fetchall()
-            categories_sql = (
-                "SELECT DISTINCT category FROM products "
-                "ORDER BY category"
-            )
-            cur.execute(categories_sql)
-            categories = [r[0] for r in cur.fetchall()]
         finally:
             cur.close()
+
+    categories = _get_categories(conn, database_url)
     return render_template("products.html", products=products, categories=categories)
 
 
@@ -383,6 +486,9 @@ def operations_page():
     init_db()
     conn = get_db()
     database_url, _ = get_db_config()
+    end = datetime.utcnow().date()
+    start = end - timedelta(days=6)
+
     # load products for dropdown
     if database_url:
         cur = conn.cursor()
@@ -457,7 +563,15 @@ def operations_page():
         finally:
             cur.close()
 
-    return render_template('operations.html', products=products, history=history)
+    categories = _get_categories(conn, database_url)
+    return render_template(
+        'operations.html',
+        products=products,
+        history=history,
+        categories=categories,
+        default_start=start.isoformat(),
+        default_end=end.isoformat(),
+    )
 
 
 def _query_reports_postgres(conn, start_date, end_date):
@@ -968,8 +1082,8 @@ def add_product():
     product row, returning the created product id.
     """
     data = request.get_json(silent=True) or {}
-    name = data.get('name')
-    category = data.get('category', 'Other')
+    name = str(data.get('name', '')).strip()
+    category = str(data.get('category', 'Other') or 'Other').strip() or 'Other'
     try:
         price = float(data.get('price', 0))
     except (TypeError, ValueError):
@@ -979,47 +1093,241 @@ def add_product():
     except (TypeError, ValueError):
         return jsonify({'success': False, 'message': 'Invalid stock'}), 400
     image_url = data.get('image_url')
+    if not name:
+        return jsonify({'success': False, 'message': 'Məhsul adı vacibdir'}), 400
 
     conn = get_db()
     database_url, _ = get_db_config()
-    if database_url:
-        cur = conn.cursor()
-        try:
-            cur.execute(
-                "INSERT INTO products (name, category, price, stock, image_url) "
-                "VALUES (%s, %s, %s, %s, %s) RETURNING id",
-                (name, category, price, stock, image_url),
-            )
-            row = cur.fetchone()
-            conn.commit()
-            if row is None:
-                new_id = None
-            elif isinstance(row, dict):
-                new_id = row.get('id')
-            else:
-                new_id = row[0]
-            return jsonify({'success': True, 'id': new_id})
-        except (psycopg2.Error, sqlite3.Error) as exc:
-            conn.rollback()
-            return jsonify({'success': False, 'message': str(exc)}), 500
-        finally:
-            cur.close()
-    else:
-        cur = conn.cursor()
-        try:
-            cur.execute(
-                "INSERT INTO products (name, category, price, stock, image_url) "
-                "VALUES (?, ?, ?, ?, ?)",
-                (name, category, price, stock, image_url),
-            )
-            new_id = cur.lastrowid
-            conn.commit()
-            return jsonify({'success': True, 'id': new_id})
-        except (sqlite3.Error, psycopg2.Error) as exc:
-            conn.rollback()
-            return jsonify({'success': False, 'message': str(exc)}), 500
-        finally:
-            cur.close()
+    try:
+        if database_url:
+            cur = conn.cursor()
+            try:
+                cur.execute(
+                    "INSERT INTO products (name, category, price, stock, image_url) "
+                    "VALUES (%s, %s, %s, %s, %s) RETURNING id",
+                    (name, category, price, stock, image_url),
+                )
+                row = cur.fetchone()
+                if row is None:
+                    new_id = None
+                elif isinstance(row, dict):
+                    new_id = row.get('id')
+                else:
+                    new_id = row[0]
+                _ensure_category(conn, database_url, category)
+                conn.commit()
+                return jsonify({'success': True, 'id': new_id})
+            finally:
+                cur.close()
+        else:
+            cur = conn.cursor()
+            try:
+                cur.execute(
+                    "INSERT INTO products (name, category, price, stock, image_url) "
+                    "VALUES (?, ?, ?, ?, ?)",
+                    (name, category, price, stock, image_url),
+                )
+                new_id = cur.lastrowid
+                _ensure_category(conn, database_url, category)
+                conn.commit()
+                return jsonify({'success': True, 'id': new_id})
+            finally:
+                cur.close()
+    except (sqlite3.Error, psycopg2.Error) as exc:
+        conn.rollback()
+        return jsonify({'success': False, 'message': str(exc)}), 500
+
+
+@app.route('/api/products/<int:product_id>', methods=['PUT'])
+def update_product(product_id):
+    """Update a product record."""
+    data = request.get_json(silent=True) or {}
+    name = str(data.get('name', '')).strip()
+    category = str(data.get('category', 'Other') or 'Other').strip() or 'Other'
+    try:
+        price = float(data.get('price', 0))
+    except (TypeError, ValueError):
+        return jsonify({'success': False, 'message': 'Invalid price'}), 400
+    try:
+        stock = int(data.get('stock', 0))
+    except (TypeError, ValueError):
+        return jsonify({'success': False, 'message': 'Invalid stock'}), 400
+    image_url = data.get('image_url')
+    if not name:
+        return jsonify({'success': False, 'message': 'Məhsul adı vacibdir'}), 400
+
+    conn = get_db()
+    database_url, _ = get_db_config()
+    try:
+        if database_url:
+            cur = conn.cursor()
+            try:
+                cur.execute(
+                    "UPDATE products SET name = %s, category = %s, price = %s, stock = %s, image_url = %s WHERE id = %s",
+                    (name, category, price, stock, image_url, product_id),
+                )
+                if cur.rowcount == 0:
+                    return jsonify({'success': False, 'message': 'Məhsul tapılmadı'}), 404
+                _ensure_category(conn, database_url, category)
+                conn.commit()
+                return jsonify({'success': True, 'id': product_id})
+            finally:
+                cur.close()
+        else:
+            cur = conn.cursor()
+            try:
+                cur.execute(
+                    "UPDATE products SET name = ?, category = ?, price = ?, stock = ?, image_url = ? WHERE id = ?",
+                    (name, category, price, stock, image_url, product_id),
+                )
+                if cur.rowcount == 0:
+                    return jsonify({'success': False, 'message': 'Məhsul tapılmadı'}), 404
+                _ensure_category(conn, database_url, category)
+                conn.commit()
+                return jsonify({'success': True, 'id': product_id})
+            finally:
+                cur.close()
+    except (sqlite3.Error, psycopg2.Error) as exc:
+        conn.rollback()
+        return jsonify({'success': False, 'message': str(exc)}), 500
+
+
+@app.route('/api/products/<int:product_id>', methods=['DELETE'])
+def delete_product(product_id):
+    """Delete a product and any related stock/sale records."""
+    conn = get_db()
+    database_url, _ = get_db_config()
+    try:
+        if database_url:
+            cur = conn.cursor()
+            try:
+                cur.execute("DELETE FROM sale_items WHERE product_id = %s", (product_id,))
+                cur.execute("DELETE FROM stock_movements WHERE product_id = %s", (product_id,))
+                cur.execute("DELETE FROM products WHERE id = %s", (product_id,))
+                if cur.rowcount == 0:
+                    return jsonify({'success': False, 'message': 'Məhsul tapılmadı'}), 404
+                conn.commit()
+                return jsonify({'success': True})
+            finally:
+                cur.close()
+        else:
+            cur = conn.cursor()
+            try:
+                cur.execute("DELETE FROM sale_items WHERE product_id = ?", (product_id,))
+                cur.execute("DELETE FROM stock_movements WHERE product_id = ?", (product_id,))
+                cur.execute("DELETE FROM products WHERE id = ?", (product_id,))
+                if cur.rowcount == 0:
+                    return jsonify({'success': False, 'message': 'Məhsul tapılmadı'}), 404
+                conn.commit()
+                return jsonify({'success': True})
+            finally:
+                cur.close()
+    except (sqlite3.Error, psycopg2.Error) as exc:
+        conn.rollback()
+        return jsonify({'success': False, 'message': str(exc)}), 500
+
+
+@app.route('/api/categories', methods=['POST'])
+def add_category():
+    """Add a new category name."""
+    data = request.get_json(silent=True) or {}
+    name = str(data.get('name', '')).strip()
+    if not name:
+        return jsonify({'success': False, 'message': 'Kateqoriya adı vacibdir'}), 400
+
+    conn = get_db()
+    database_url, _ = get_db_config()
+    try:
+        if database_url:
+            cur = conn.cursor()
+            try:
+                cur.execute(
+                    "INSERT INTO categories (name) VALUES (%s) ON CONFLICT (name) DO NOTHING",
+                    (name,),
+                )
+                conn.commit()
+            finally:
+                cur.close()
+        else:
+            cur = conn.cursor()
+            try:
+                cur.execute("INSERT OR IGNORE INTO categories (name) VALUES (?)", (name,))
+                conn.commit()
+            finally:
+                cur.close()
+        return jsonify({'success': True, 'category': name})
+    except (sqlite3.Error, psycopg2.Error) as exc:
+        conn.rollback()
+        return jsonify({'success': False, 'message': str(exc)}), 500
+
+
+@app.route('/api/categories/<category_name>', methods=['PUT'])
+def rename_category(category_name):
+    """Rename a category and update any products that use it."""
+    data = request.get_json(silent=True) or {}
+    new_name = str(data.get('new_name', '')).strip()
+    old_name = category_name.strip()
+    if not new_name:
+        return jsonify({'success': False, 'message': 'Yeni kateqoriya adı vacibdir'}), 400
+
+    conn = get_db()
+    database_url, _ = get_db_config()
+    try:
+        if database_url:
+            cur = conn.cursor()
+            try:
+                cur.execute("UPDATE products SET category = %s WHERE category = %s", (new_name, old_name))
+                cur.execute("UPDATE categories SET name = %s WHERE name = %s", (new_name, old_name))
+                if cur.rowcount == 0:
+                    pass
+                _ensure_category(conn, database_url, new_name)
+                conn.commit()
+            finally:
+                cur.close()
+        else:
+            cur = conn.cursor()
+            try:
+                cur.execute("UPDATE products SET category = ? WHERE category = ?", (new_name, old_name))
+                cur.execute("UPDATE categories SET name = ? WHERE name = ?", (new_name, old_name))
+                _ensure_category(conn, database_url, new_name)
+                conn.commit()
+            finally:
+                cur.close()
+        return jsonify({'success': True, 'category': new_name})
+    except (sqlite3.Error, psycopg2.Error) as exc:
+        conn.rollback()
+        return jsonify({'success': False, 'message': str(exc)}), 500
+
+
+@app.route('/api/categories/<category_name>', methods=['DELETE'])
+def delete_category(category_name):
+    """Delete a category by moving its products to Other."""
+    conn = get_db()
+    database_url, _ = get_db_config()
+    old_name = category_name.strip()
+    try:
+        if database_url:
+            cur = conn.cursor()
+            try:
+                cur.execute("UPDATE products SET category = %s WHERE category = %s", ('Other', old_name))
+                cur.execute("DELETE FROM categories WHERE name = %s", (old_name,))
+                _ensure_category(conn, database_url, 'Other')
+                conn.commit()
+            finally:
+                cur.close()
+        else:
+            cur = conn.cursor()
+            try:
+                cur.execute("UPDATE products SET category = ? WHERE category = ?", ('Other', old_name))
+                cur.execute("DELETE FROM categories WHERE name = ?", (old_name,))
+                _ensure_category(conn, database_url, 'Other')
+                conn.commit()
+            finally:
+                cur.close()
+        return jsonify({'success': True, 'category': old_name})
+    except (sqlite3.Error, psycopg2.Error) as exc:
+        conn.rollback()
+        return jsonify({'success': False, 'message': str(exc)}), 500
 
 
 if __name__ == "__main__":

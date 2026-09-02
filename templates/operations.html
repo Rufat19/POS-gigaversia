@@ -22,6 +22,104 @@
     <div class="container">
       <div class="operations-grid">
         <section class="card operations-card">
+          <h3>Kateqoriyalar</h3>
+          <div class="form-grid">
+            <label class="form-group">
+              Yeni kateqoriya
+              <input id="new-category-name" placeholder="Məs. Fastfood">
+            </label>
+            <div class="form-actions">
+              <button id="add-category-btn" class="add-btn" type="button">Kateqoriya əlavə et</button>
+              <div id="category-msg" class="form-message"></div>
+            </div>
+          </div>
+
+          <div class="form-grid" style="margin-top:18px;">
+            <label class="form-group">
+              Dəyişdiriləcək kateqoriya
+              <select id="rename-category-select">
+                {% for cat in categories %}
+                  <option value="{{ cat }}">{{ cat }}</option>
+                {% endfor %}
+              </select>
+            </label>
+            <label class="form-group">
+              Yeni ad
+              <input id="rename-category-name" placeholder="Yeni kateqoriya adı">
+            </label>
+            <div class="form-actions">
+              <button id="rename-category-btn" class="btn secondary" type="button">Dəyişdir</button>
+            </div>
+          </div>
+
+          <div class="form-grid" style="margin-top:18px;">
+            <label class="form-group">
+              Silinəcək kateqoriya
+              <select id="delete-category-select">
+                {% for cat in categories %}
+                  <option value="{{ cat }}">{{ cat }}</option>
+                {% endfor %}
+              </select>
+            </label>
+            <div class="form-actions">
+              <button id="delete-category-btn" class="btn danger" type="button">Kateqoriyanı sil</button>
+            </div>
+          </div>
+        </section>
+
+        <section class="card operations-card">
+          <h3>Məhsul əlavə et</h3>
+          <div class="form-grid">
+            <label class="form-group">
+              Məhsul adı
+              <input id="new-product-name" placeholder="Məhsul adı">
+            </label>
+            <label class="form-group">
+              Kateqoriya
+              <select id="new-product-category">
+                {% for cat in categories %}
+                  <option value="{{ cat }}">{{ cat }}</option>
+                {% endfor %}
+              </select>
+            </label>
+            <label class="form-group">
+              Qiymət
+              <input id="new-product-price" type="number" step="0.01" min="0" value="0">
+            </label>
+            <label class="form-group">
+              Stok
+              <input id="new-product-stock" type="number" min="0" value="0">
+            </label>
+            <label class="form-group">
+              Şəkil URL
+              <input id="new-product-image" placeholder="(isteğe bağlı)">
+            </label>
+            <div class="form-actions">
+              <button id="add-product-btn" class="add-btn" type="button">Məhsul əlavə et</button>
+              <div id="product-msg" class="form-message"></div>
+            </div>
+          </div>
+        </section>
+
+        <section class="card operations-card">
+          <h3>Məhsul idarəetməsi</h3>
+          <div id="product-management-list" class="management-list">
+            {% for p in products %}
+              <div class="management-row" data-product-id="{{ p[0] }}" data-product-name="{{ p[1] }}" data-product-category="{{ p[2] if p|length > 2 else 'Other' }}" data-product-price="{{ p[3] }}" data-product-stock="{{ p[4] }}" data-product-image="{{ p[5] if p|length > 5 else '' }}">
+                <div>
+                  <strong>{{ p[1] }}</strong><br>
+                  <span>{{ p[2] }} · {{ p[3] }} AZN · Stok: {{ p[4] }}</span>
+                </div>
+                <div class="inline-actions">
+                  <button class="btn secondary product-edit-btn" type="button">Edit</button>
+                  <button class="btn danger product-delete-btn" type="button">Delete</button>
+                </div>
+              </div>
+            {% endfor %}
+          </div>
+        </section>
+
+        <section class="card operations-card">
           <h3>Daxilolma / İtki əlavə et</h3>
           <div class="form-grid">
             <label class="form-group">
@@ -55,8 +153,46 @@
         </section>
 
         <section class="card operations-card history-card">
-          <h3>Tam tarixçə</h3>
-          <div class="table-wrap">
+          <div class="history-header-row">
+            <h3>Tarixçə</h3>
+            <div class="history-meta">
+              <span id="history-count">0</span> əməliyyat
+            </div>
+          </div>
+
+          <div class="history-presets" aria-label="Tarixçə qısa filtrləri">
+            <button class="preset-btn active" data-range="7" type="button">Son 7 gün</button>
+            <button class="preset-btn" data-range="30" type="button">Son 30 gün</button>
+            <button class="preset-btn" data-range="month" type="button">Bu ay</button>
+            <button class="preset-btn" data-range="all" type="button">Hamısı</button>
+          </div>
+
+          <div class="history-filters">
+            <label class="date-filter">
+              <span>Başlanğıc</span>
+              <input id="history-start" type="date" value="{{ default_start }}">
+            </label>
+            <label class="date-filter">
+              <span>Bitmə</span>
+              <input id="history-end" type="date" value="{{ default_end }}">
+            </label>
+            <label class="date-filter">
+              <span>Növ</span>
+              <select id="history-kind">
+                <option value="all">Hamısı</option>
+                <option value="sale">Satış</option>
+                <option value="daxilolma">Daxilolma</option>
+                <option value="itki">İtki</option>
+              </select>
+            </label>
+            <label class="date-filter history-search-filter">
+              <span>Məhsul</span>
+              <input id="history-product" type="search" placeholder="Ad axtar...">
+            </label>
+            <button id="history-reset-btn" class="btn secondary" type="button">Sıfırla</button>
+          </div>
+
+          <div class="table-wrap history-scroll">
             <table class="history-table">
               <thead>
                 <tr>
@@ -69,7 +205,7 @@
               </thead>
               <tbody id="history-body">
                 {% for row in history %}
-                  <tr>
+                  <tr data-date="{{ row[0] }}" data-kind="{{ row[2] }}" data-product="{{ row[1] }}">
                     <td>{{ row[0] }}</td>
                     <td>{{ row[1] }}</td>
                     <td class="kind-{{ row[2] }}">{{ 'Satış' if row[2] == 'sale' else row[2].capitalize() }}</td>
@@ -85,6 +221,258 @@
     </div>
 
     <script>
+      function parseHistoryDate(value) {
+        if (!value) return null;
+        const normalized = String(value).replace(' ', 'T');
+        const date = new Date(normalized);
+        return Number.isNaN(date.getTime()) ? null : date;
+      }
+
+      function setRangePreset(days) {
+        const end = new Date();
+        const start = new Date();
+        if (days === 'all') {
+          return { start: '', end: '' };
+        }
+        if (days === 'month') {
+          start.setDate(1);
+          return { start: start.toISOString().slice(0, 10), end: end.toISOString().slice(0, 10) };
+        }
+        start.setDate(end.getDate() - (Number(days) - 1));
+        return { start: start.toISOString().slice(0, 10), end: end.toISOString().slice(0, 10) };
+      }
+
+      function applyHistoryFilters() {
+        const startInput = document.getElementById('history-start');
+        const endInput = document.getElementById('history-end');
+        const kindInput = document.getElementById('history-kind');
+        const productInput = document.getElementById('history-product');
+        const countLabel = document.getElementById('history-count');
+        const rows = Array.from(document.querySelectorAll('#history-body tr'));
+
+        if (!startInput || !endInput || !kindInput || !productInput || !countLabel) return;
+
+        const startDate = startInput.value ? new Date(`${startInput.value}T00:00:00`) : null;
+        const endDate = endInput.value ? new Date(`${endInput.value}T23:59:59`) : null;
+        const kindValue = kindInput.value;
+        const searchValue = productInput.value.trim().toLowerCase();
+
+        let visible = 0;
+        rows.forEach((row) => {
+          const rowDate = parseHistoryDate(row.dataset.date);
+          const productName = (row.dataset.product || '').toLowerCase();
+          const rowKind = (row.dataset.kind || '').toLowerCase();
+
+          let matches = true;
+          if (startDate && rowDate && rowDate < startDate) matches = false;
+          if (endDate && rowDate && rowDate > endDate) matches = false;
+          if (kindValue !== 'all' && rowKind !== kindValue) matches = false;
+          if (searchValue && !productName.includes(searchValue)) matches = false;
+
+          row.style.display = matches ? '' : 'none';
+          if (matches) visible += 1;
+        });
+
+        countLabel.textContent = String(visible);
+      }
+
+      function syncCategorySelectors() {
+        const categories = Array.from(document.querySelectorAll('#rename-category-select option, #delete-category-select option, #new-product-category option')).map(option => option.value).filter(Boolean);
+        const unique = [...new Set(categories)].sort();
+        const renameSelect = document.getElementById('rename-category-select');
+        const deleteSelect = document.getElementById('delete-category-select');
+        const productSelect = document.getElementById('new-product-category');
+
+        if (!renameSelect || !deleteSelect || !productSelect) return;
+
+        const currentRename = renameSelect.value;
+        const currentDelete = deleteSelect.value;
+        const currentProduct = productSelect.value;
+
+        renameSelect.innerHTML = unique.map(cat => `<option value="${cat}">${cat}</option>`).join('');
+        deleteSelect.innerHTML = unique.map(cat => `<option value="${cat}">${cat}</option>`).join('');
+        productSelect.innerHTML = unique.map(cat => `<option value="${cat}">${cat}</option>`).join('');
+
+        if (unique.includes(currentRename)) renameSelect.value = currentRename;
+        if (unique.includes(currentDelete)) deleteSelect.value = currentDelete;
+        if (unique.includes(currentProduct)) productSelect.value = currentProduct;
+        if (!unique.length) {
+          const fallback = '<option value="Other">Other</option>';
+          renameSelect.innerHTML = fallback;
+          deleteSelect.innerHTML = fallback;
+          productSelect.innerHTML = fallback;
+        }
+      }
+
+      const historyInputs = [
+        document.getElementById('history-start'),
+        document.getElementById('history-end'),
+        document.getElementById('history-kind'),
+        document.getElementById('history-product')
+      ].filter(Boolean);
+
+      historyInputs.forEach((input) => {
+        input.addEventListener('input', applyHistoryFilters);
+        input.addEventListener('change', applyHistoryFilters);
+      });
+
+      document.querySelectorAll('.preset-btn').forEach((button) => {
+        button.addEventListener('click', () => {
+          document.querySelectorAll('.preset-btn').forEach((btn) => btn.classList.toggle('active', btn === button));
+          const startInput = document.getElementById('history-start');
+          const endInput = document.getElementById('history-end');
+          const range = button.dataset.range;
+          const rangeData = setRangePreset(range);
+
+          if (startInput) startInput.value = rangeData.start;
+          if (endInput) endInput.value = rangeData.end;
+          applyHistoryFilters();
+        });
+      });
+
+      document.getElementById('history-reset-btn')?.addEventListener('click', () => {
+        const startInput = document.getElementById('history-start');
+        const endInput = document.getElementById('history-end');
+        const kindInput = document.getElementById('history-kind');
+        const productInput = document.getElementById('history-product');
+        if (startInput) startInput.value = startInput.dataset.defaultValue || '';
+        if (endInput) endInput.value = endInput.dataset.defaultValue || '';
+        if (kindInput) kindInput.value = 'all';
+        if (productInput) productInput.value = '';
+        document.querySelectorAll('.preset-btn').forEach((btn) => btn.classList.toggle('active', btn.dataset.range === '7'));
+        applyHistoryFilters();
+      });
+
+      document.addEventListener('DOMContentLoaded', () => {
+        const startInput = document.getElementById('history-start');
+        const endInput = document.getElementById('history-end');
+        if (startInput) startInput.dataset.defaultValue = startInput.value;
+        if (endInput) endInput.dataset.defaultValue = endInput.value;
+        applyHistoryFilters();
+      });
+
+      document.getElementById('add-category-btn').addEventListener('click', async ()=>{
+        const name = document.getElementById('new-category-name').value.trim();
+        const msg = document.getElementById('category-msg');
+        if(!name){ msg.textContent='Kateqoriya adı daxil edin.'; return; }
+        try {
+          const res = await fetch('/api/categories', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({name})});
+          const data = await res.json();
+          if(!res.ok) throw new Error(data.message || 'Kateqoriya əlavə edilmədi.');
+          msg.textContent='Kateqoriya əlavə edildi.';
+          document.getElementById('new-category-name').value='';
+          location.reload();
+        } catch(e){ msg.textContent='Xəta: '+e.message; }
+      });
+
+      document.getElementById('rename-category-btn').addEventListener('click', async ()=>{
+        const oldName = document.getElementById('rename-category-select').value;
+        const newName = document.getElementById('rename-category-name').value.trim();
+        const msg = document.getElementById('category-msg');
+        if(!oldName || !newName){ msg.textContent='Kateqoriya və yeni ad daxil edin.'; return; }
+        try {
+          const res = await fetch(`/api/categories/${encodeURIComponent(oldName)}`, {method:'PUT', headers:{'Content-Type':'application/json'}, body:JSON.stringify({new_name:newName})});
+          const data = await res.json();
+          if(!res.ok) throw new Error(data.message || 'Kateqoriya dəyişdirilmədi.');
+          msg.textContent='Kateqoriya dəyişdirildi.';
+          document.getElementById('rename-category-name').value='';
+          location.reload();
+        } catch(e){ msg.textContent='Xəta: '+e.message; }
+      });
+
+      document.getElementById('delete-category-btn').addEventListener('click', async ()=>{
+        const category = document.getElementById('delete-category-select').value;
+        const msg = document.getElementById('category-msg');
+        if(!category){ msg.textContent='Silmək üçün kateqoriya seçin.'; return; }
+        if(!confirm(`${category} kateqoriyasını silmək istədiyinizə əminsiniz? Məhsullar "Other" kateqoriyasına keçirəcək.`)) return;
+        try {
+          const res = await fetch(`/api/categories/${encodeURIComponent(category)}`, {method:'DELETE'});
+          const data = await res.json();
+          if(!res.ok) throw new Error(data.message || 'Kateqoriya silinmədi.');
+          msg.textContent='Kateqoriya silindi.';
+          location.reload();
+        } catch(e){ msg.textContent='Xəta: '+e.message; }
+      });
+
+      async function deleteProduct(productId) {
+        if(!confirm('Bu məhsulu silmək istədiyinizə əminsiniz?')) return;
+        try {
+          const res = await fetch(`/api/products/${productId}`, {method:'DELETE'});
+          const data = await res.json();
+          if(!res.ok) throw new Error(data.message || 'Məhsul silinmədi.');
+          location.reload();
+        } catch(e){ alert(e.message); }
+      }
+
+      async function editProduct(productId) {
+        const row = document.querySelector(`.management-row[data-product-id="${productId}"]`);
+        if (!row) return;
+        const currentName = row.dataset.productName || '';
+        const currentCategory = row.dataset.productCategory || 'Other';
+        const currentPrice = row.dataset.productPrice || '0';
+        const currentStock = row.dataset.productStock || '0';
+        const currentImage = row.dataset.productImage || '';
+
+        const name = prompt('Məhsul adı:', currentName);
+        if (name === null) return;
+        const category = prompt('Kateqoriya:', currentCategory);
+        if (category === null) return;
+        const price = prompt('Qiymət:', currentPrice);
+        if (price === null) return;
+        const stock = prompt('Stok:', currentStock);
+        if (stock === null) return;
+        const image_url = prompt('Şəkil URL (istəyə bağlı):', currentImage);
+        if (image_url === null) return;
+
+        try {
+          const res = await fetch(`/api/products/${productId}`, {
+            method:'PUT',
+            headers:{'Content-Type':'application/json'},
+            body: JSON.stringify({ name: name.trim(), category: (category || 'Other').trim() || 'Other', price: Number(price), stock: Number(stock), image_url: image_url.trim() || null })
+          });
+          const data = await res.json();
+          if(!res.ok) throw new Error(data.message || 'Məhsul yenilənmədi.');
+          location.reload();
+        } catch(e){ alert(e.message); }
+      }
+
+      document.getElementById('add-product-btn').addEventListener('click', async ()=>{
+        const name = document.getElementById('new-product-name').value.trim();
+        const category = document.getElementById('new-product-category').value || 'Other';
+        const price = Number(document.getElementById('new-product-price').value || 0);
+        const stock = Number(document.getElementById('new-product-stock').value || 0);
+        const image_url = document.getElementById('new-product-image').value.trim();
+        const msg = document.getElementById('product-msg');
+        if(!name){ msg.textContent='Məhsul adı daxil edin.'; return; }
+        try {
+          const res = await fetch('/add_product', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({name, category, price, stock, image_url})});
+          const data = await res.json();
+          if(!res.ok) throw new Error(data.message || 'Məhsul əlavə edilmədi.');
+          msg.textContent='Məhsul əlavə edildi.';
+          document.getElementById('new-product-name').value='';
+          document.getElementById('new-product-price').value='0';
+          document.getElementById('new-product-stock').value='0';
+          document.getElementById('new-product-image').value='';
+          location.reload();
+        } catch(e){ msg.textContent='Xəta: '+e.message; }
+      });
+
+      document.querySelectorAll('.product-delete-btn').forEach((button) => {
+        button.addEventListener('click', () => {
+          const row = button.closest('.management-row');
+          if (!row) return;
+          deleteProduct(Number(row.dataset.productId));
+        });
+      });
+
+      document.querySelectorAll('.product-edit-btn').forEach((button) => {
+        button.addEventListener('click', () => {
+          const row = button.closest('.management-row');
+          if (!row) return;
+          editProduct(Number(row.dataset.productId));
+        });
+      });
+
       document.getElementById('mov-add').addEventListener('click', async ()=>{
         const product_id = document.getElementById('mov-product').value;
         const type = document.getElementById('mov-type').value;
@@ -100,6 +488,10 @@
           msg.textContent='Uğurla əlavə olundu.';
           setTimeout(()=>location.reload(),500);
         }catch(e){ msg.textContent='Xəta: '+e.message; }
+      });
+
+      document.addEventListener('DOMContentLoaded', ()=>{
+        syncCategorySelectors();
       });
     </script>
   </body>
