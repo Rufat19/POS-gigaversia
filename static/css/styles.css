@@ -193,6 +193,7 @@ html{scroll-behavior:smooth}
 .credit-order-card small{color:#64748b;}
 .credit-total{color:#0f766e;white-space:nowrap;}
 .credit-order-card ul{list-style:none;padding:0;margin:12px 0 16px;display:grid;gap:7px;color:#475569;}
+.payment-info{margin-top:12px;padding:9px 10px;border-radius:10px;background:#f0fdf4;color:#166534;font-size:.84rem;}
 .credit-order-card li{display:flex;justify-content:space-between;gap:10px;}
 .credit-order-card li strong{color:#1f2937;white-space:nowrap;}
 .credit-order-actions{display:flex;gap:8px;flex-wrap:wrap;}

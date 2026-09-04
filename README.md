@@ -46,6 +46,19 @@ Kiçik biznes üçün hazırlanmış, toxunma-dostu (touch-friendly) satış nö
 | Müdir | POS + Məhsul əlavə etmə + Əməliyyatlar + Hesabatlar |
 
 Hazırkı PIN-lər `app.py` daxilində `PIN_USERS` xəritəsində təyin olunur. Production mühitində onları dəyişmək tövsiyə edilir.
+PIN-lər artıq `.env` dəyişənlərindən oxunur:
+
+- `SELLER_PIN`
+- `MANAGER_PIN`
+- `SECRET_KEY`
+
+### 6. Audit və təhlükəsizlik
+
+- Satışın kim tərəfindən yaradıldığı audit jurnalında saxlanılır.
+- Məhsul yaratma, dəyişmə və silmə əməliyyatları qeydə alınır.
+- Audit jurnalına yalnız müdirin `/api/audit-log` endpoint-i ilə çıxışı var.
+- Satışın ləğvi üçün müdir PIN-i tələb olunur; ləğv edilən məhsulların stoku bərpa edilir.
+- Ləğv edilmiş satışlar hesabatlara daxil edilmir.
 
 ## Layihəni lokal işə salmaq
 
@@ -85,7 +98,7 @@ web: gunicorn -w 4 -b 0.0.0.0:$PORT app:app
 - `stock_movements`
 - `credit_orders`, `credit_order_items`
 
-`DATABASE_URL` olduqda PostgreSQL, olmadıqda `SQLITE_DB_PATH` (default: `app.db`) istifadə edilir.
+`DATABASE_URL` təyin edildikdə əsas və qalıcı storage PostgreSQL olur. `DATABASE_URL` olmadıqda lokal development üçün `SQLITE_DB_PATH` (default: `app.db`) istifadə edilir. Railway-də məlumatların itirilməməsi üçün PostgreSQL servisini qoşduqdan sonra onun verdiyi `DATABASE_URL` dəyişənini tətbiqə əlavə edin.
 
 ## Qeyd
 

@@ -33,8 +33,8 @@ app.config["JSON_SORT_KEYS"] = False
 app.config["SECRET_KEY"] = os.getenv("SECRET_KEY", "pos-pin-key-2026")
 
 PIN_USERS = {
-    "1111": "seller",
-    "1991": "manager",
+    os.getenv("SELLER_PIN", "1111"): "seller",
+    os.getenv("MANAGER_PIN", "1991"): "manager",
 }
 
 DEFAULT_PRODUCTS = [
@@ -183,6 +183,37 @@ def enforce_access():
         return jsonify({'success': False, 'message': 'Bu əməliyyat üçün icazə yoxdur.'}), 403
 
 
+def _audit_event(conn, database_url, action, entity_type, entity_id=None, details=None):
+    """Record the current role's action for accountability."""
+    actor_role = session.get("role", "system")
+    if database_url:
+        cur = conn.cursor()
+        try:
+            cur.execute(
+                """
+                INSERT INTO audit_log
+                    (actor_role, action, entity_type, entity_id, details)
+                VALUES (%s, %s, %s, %s, %s)
+                """,
+                (actor_role, action, entity_type, entity_id, details),
+            )
+        finally:
+            cur.close()
+    else:
+        cur = conn.cursor()
+        try:
+            cur.execute(
+                """
+                INSERT INTO audit_log
+                    (actor_role, action, entity_type, entity_id, details)
+                VALUES (?, ?, ?, ?, ?)
+                """,
+                (actor_role, action, entity_type, entity_id, details),
+            )
+        finally:
+            cur.close()
+
+
 @app.route('/login', methods=['GET', 'POST'])
 def login_page():
     """Authenticate a seller or manager using a 4-digit PIN."""
@@ -196,6 +227,11 @@ def login_page():
         if role:
             session.clear()
             session['role'] = role
+            init_db()
+            conn = get_db()
+            database_url, _ = get_db_config()
+            _audit_event(conn, database_url, "login", "session", details=role)
+            conn.commit()
             return redirect(url_for('products_page'))
         error = 'Yanlış PIN kodu.'
 
@@ -250,10 +286,14 @@ def _create_tables_postgres(conn):
             CREATE TABLE IF NOT EXISTS sales (
                 id SERIAL PRIMARY KEY,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                total_amount NUMERIC(10,2) NOT NULL
+                total_amount NUMERIC(10,2) NOT NULL,
+                status VARCHAR(20) NOT NULL DEFAULT 'completed',
+                cancelled_at TIMESTAMP
             )
             """
         )
+        cur.execute("ALTER TABLE sales ADD COLUMN IF NOT EXISTS status VARCHAR(20) NOT NULL DEFAULT 'completed'")
+        cur.execute("ALTER TABLE sales ADD COLUMN IF NOT EXISTS cancelled_at TIMESTAMP")
         cur.execute(
             """
             CREATE TABLE IF NOT EXISTS sale_items (
@@ -280,15 +320,32 @@ def _create_tables_postgres(conn):
         )
         cur.execute(
             """
+            CREATE TABLE IF NOT EXISTS audit_log (
+                id SERIAL PRIMARY KEY,
+                actor_role VARCHAR(30) NOT NULL,
+                action VARCHAR(80) NOT NULL,
+                entity_type VARCHAR(40) NOT NULL,
+                entity_id INTEGER,
+                details TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+            """
+        )
+        cur.execute(
+            """
             CREATE TABLE IF NOT EXISTS credit_orders (
                 id SERIAL PRIMARY KEY,
                 customer_name VARCHAR(200) NOT NULL,
                 status VARCHAR(20) NOT NULL DEFAULT 'open',
                 total_amount NUMERIC(10,2) NOT NULL DEFAULT 0,
+                paid_amount NUMERIC(10,2) NOT NULL DEFAULT 0,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 paid_at TIMESTAMP
             )
             """
+        )
+        cur.execute(
+            "ALTER TABLE credit_orders ADD COLUMN IF NOT EXISTS paid_amount NUMERIC(10,2) NOT NULL DEFAULT 0"
         )
         cur.execute(
             """
@@ -364,10 +421,18 @@ def _create_tables_sqlite(conn):
             CREATE TABLE IF NOT EXISTS sales (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-                total_amount REAL NOT NULL
+                total_amount REAL NOT NULL,
+                status TEXT NOT NULL DEFAULT 'completed',
+                cancelled_at TEXT
             )
             """
         )
+        cur.execute("PRAGMA table_info('sales')")
+        sales_columns = {row[1] for row in cur.fetchall()}
+        if "status" not in sales_columns:
+            cur.execute("ALTER TABLE sales ADD COLUMN status TEXT NOT NULL DEFAULT 'completed'")
+        if "cancelled_at" not in sales_columns:
+            cur.execute("ALTER TABLE sales ADD COLUMN cancelled_at TEXT")
         cur.execute(
             """
             CREATE TABLE IF NOT EXISTS sale_items (
@@ -397,16 +462,36 @@ def _create_tables_sqlite(conn):
         )
         cur.execute(
             """
+            CREATE TABLE IF NOT EXISTS audit_log (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                actor_role TEXT NOT NULL,
+                action TEXT NOT NULL,
+                entity_type TEXT NOT NULL,
+                entity_id INTEGER,
+                details TEXT,
+                created_at TEXT DEFAULT CURRENT_TIMESTAMP
+            )
+            """
+        )
+        cur.execute(
+            """
             CREATE TABLE IF NOT EXISTS credit_orders (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 customer_name TEXT NOT NULL,
                 status TEXT NOT NULL DEFAULT 'open',
                 total_amount REAL NOT NULL DEFAULT 0,
+                paid_amount REAL NOT NULL DEFAULT 0,
                 created_at TEXT DEFAULT CURRENT_TIMESTAMP,
                 paid_at TEXT
             )
             """
         )
+        cur.execute("PRAGMA table_info('credit_orders')")
+        credit_order_columns = {row[1] for row in cur.fetchall()}
+        if "paid_amount" not in credit_order_columns:
+            cur.execute(
+                "ALTER TABLE credit_orders ADD COLUMN paid_amount REAL NOT NULL DEFAULT 0"
+            )
         cur.execute(
             """
             CREATE TABLE IF NOT EXISTS credit_order_items (
@@ -640,6 +725,7 @@ def operations_page():
                 FROM sale_items si
                 JOIN sales s ON si.sale_id = s.id
                 JOIN products p ON si.product_id = p.id
+                WHERE s.status = 'completed'
                 UNION ALL
                 SELECT sm.created_at AS created_at,
                        p.name AS product_name,
@@ -667,6 +753,7 @@ def operations_page():
                 FROM sale_items si
                 JOIN sales s ON si.sale_id = s.id
                 JOIN products p ON si.product_id = p.id
+                WHERE s.status = 'completed'
                 UNION ALL
                 SELECT sm.created_at AS created_at,
                        p.name AS product_name,
@@ -704,7 +791,7 @@ def _query_reports_postgres(conn, start_date, end_date):
             FROM sale_items si
             JOIN sales s ON si.sale_id = s.id
             JOIN products p ON si.product_id = p.id
-            WHERE s.created_at::date BETWEEN %s AND %s
+            WHERE s.status = 'completed' AND s.created_at::date BETWEEN %s AND %s
             GROUP BY p.id, p.name
             ORDER BY total_qty DESC
             """,
@@ -719,7 +806,7 @@ def _query_reports_postgres(conn, start_date, end_date):
             FROM sale_items si
             JOIN sales s ON si.sale_id = s.id
             JOIN products p ON si.product_id = p.id
-            WHERE s.created_at::date BETWEEN %s AND %s
+            WHERE s.status = 'completed' AND s.created_at::date BETWEEN %s AND %s
             GROUP BY p.category
             ORDER BY total_amount DESC
             """,
@@ -733,7 +820,7 @@ def _query_reports_postgres(conn, start_date, end_date):
                    SUM(si.quantity * si.unit_price) AS total
             FROM sale_items si
             JOIN sales s ON si.sale_id = s.id
-            WHERE s.created_at::date BETWEEN %s AND %s
+            WHERE s.status = 'completed' AND s.created_at::date BETWEEN %s AND %s
             GROUP BY day
             ORDER BY day ASC
             """,
@@ -747,7 +834,7 @@ def _query_reports_postgres(conn, start_date, end_date):
             FROM sale_items si
             JOIN sales s ON si.sale_id = s.id
             JOIN products p ON si.product_id = p.id
-            WHERE s.created_at::date BETWEEN %s AND %s
+            WHERE s.status = 'completed' AND s.created_at::date BETWEEN %s AND %s
             GROUP BY p.name
             ORDER BY total_qty DESC
             LIMIT 5
@@ -770,7 +857,7 @@ def _query_reports_sqlite(conn, start_date, end_date):
             FROM sale_items si
             JOIN sales s ON si.sale_id = s.id
             JOIN products p ON si.product_id = p.id
-            WHERE DATE(s.created_at) BETWEEN ? AND ?
+            WHERE s.status = 'completed' AND DATE(s.created_at) BETWEEN ? AND ?
             GROUP BY p.id, p.name
             ORDER BY total_qty DESC
             """,
@@ -1065,6 +1152,15 @@ def checkout():
         else:
             sale_id, total = _checkout_sqlite(conn, cart)
 
+        _audit_event(
+            conn,
+            database_url,
+            "sale_completed",
+            "sale",
+            sale_id,
+            f"total={total:.2f}",
+        )
+        conn.commit()
         return jsonify(
             {
                 "success": True,
@@ -1191,6 +1287,82 @@ def _checkout_sqlite(conn, cart):
 
     conn.commit()
     return sale_id, round(total_amount, 2)
+
+
+@app.route("/api/sales/<int:sale_id>/cancel", methods=["POST"])
+def cancel_sale(sale_id):
+    """Cancel a sale only after manager PIN confirmation and restore stock."""
+    data = request.get_json(silent=True) or {}
+    manager_pin = str(data.get("manager_pin", "")).strip()
+    if PIN_USERS.get(manager_pin) != "manager":
+        return jsonify({"success": False, "message": "Rəhbər PIN-i yanlışdır."}), 403
+
+    conn = get_db()
+    database_url, _ = get_db_config()
+    cur = conn.cursor()
+    try:
+        if database_url:
+            cur.execute(
+                "SELECT id, status FROM sales WHERE id = %s FOR UPDATE",
+                (sale_id,),
+            )
+        else:
+            cur.execute("SELECT id, status FROM sales WHERE id = ?", (sale_id,))
+        sale = cur.fetchone()
+        if sale is None:
+            raise ValueError("Satış tapılmadı.")
+        if _row_value(sale, "status") == "cancelled":
+            raise ValueError("Satış artıq ləğv edilib.")
+
+        if database_url:
+            cur.execute(
+                "SELECT product_id, quantity FROM sale_items WHERE sale_id = %s",
+                (sale_id,),
+            )
+            items = cur.fetchall()
+            for item in items:
+                cur.execute(
+                    "UPDATE products SET stock = stock + %s WHERE id = %s",
+                    (_row_value(item, "quantity"), _row_value(item, "product_id")),
+                )
+            cur.execute(
+                """
+                UPDATE sales
+                SET status = 'cancelled', cancelled_at = CURRENT_TIMESTAMP
+                WHERE id = %s
+                """,
+                (sale_id,),
+            )
+        else:
+            cur.execute(
+                "SELECT product_id, quantity FROM sale_items WHERE sale_id = ?",
+                (sale_id,),
+            )
+            items = cur.fetchall()
+            for item in items:
+                cur.execute(
+                    "UPDATE products SET stock = stock + ? WHERE id = ?",
+                    (_row_value(item, "quantity"), _row_value(item, "product_id")),
+                )
+            cur.execute(
+                """
+                UPDATE sales
+                SET status = 'cancelled', cancelled_at = CURRENT_TIMESTAMP
+                WHERE id = ?
+                """,
+                (sale_id,),
+            )
+        _audit_event(conn, database_url, "sale_cancelled", "sale", sale_id, "manager_pin_confirmed")
+        conn.commit()
+        return jsonify({"success": True, "message": "Satış ləğv edildi və stok bərpa olundu."})
+    except ValueError as exc:
+        conn.rollback()
+        return jsonify({"success": False, "message": str(exc)}), 400
+    except (sqlite3.Error, psycopg2.Error) as exc:
+        conn.rollback()
+        return jsonify({"success": False, "message": f"Satış ləğv edilərkən xəta: {exc}"}), 500
+    finally:
+        cur.close()
 
 
 def _credit_order_items(conn, database_url, credit_order_id):
@@ -1365,7 +1537,7 @@ def credit_orders_api():
         try:
             cur.execute(
                 """
-                SELECT id, customer_name, status, total_amount, created_at, paid_at
+                SELECT id, customer_name, status, total_amount, paid_amount, created_at, paid_at
                 FROM credit_orders
                 ORDER BY CASE WHEN status = 'open' THEN 0 ELSE 1 END, created_at DESC
                 """
@@ -1378,7 +1550,7 @@ def credit_orders_api():
         try:
             cur.execute(
                 """
-                SELECT id, customer_name, status, total_amount, created_at, paid_at
+                SELECT id, customer_name, status, total_amount, paid_amount, created_at, paid_at
                 FROM credit_orders
                 ORDER BY CASE WHEN status = 'open' THEN 0 ELSE 1 END, created_at DESC
                 """
@@ -1396,6 +1568,15 @@ def credit_orders_api():
                 "customer_name": _row_value(order, "customer_name"),
                 "status": _row_value(order, "status"),
                 "total_amount": float(_row_value(order, "total_amount")),
+                "paid_amount": float(_row_value(order, "paid_amount")),
+                "remaining_amount": max(
+                    0,
+                    round(
+                        float(_row_value(order, "total_amount"))
+                        - float(_row_value(order, "paid_amount")),
+                        2,
+                    ),
+                ),
                 "created_at": str(_row_value(order, "created_at")),
                 "paid_at": (
                     str(_row_value(order, "paid_at"))
@@ -1520,33 +1701,83 @@ def add_credit_order_items(order_id):
 
 @app.route("/api/credit-orders/<int:order_id>/pay", methods=["POST"])
 def pay_credit_order(order_id):
-    """Close an open credit order and preserve it in paid history."""
+    """Apply a partial payment or close an open credit order."""
     conn = get_db()
     database_url, _ = get_db_config()
+    data = request.get_json(silent=True) or {}
+    amount_raw = data.get("amount")
+    if amount_raw is None:
+        return jsonify({"success": False, "message": "Ödəniş məbləği düzgün deyil."}), 400
+    try:
+        payment_amount = round(float(amount_raw), 2)
+    except (TypeError, ValueError):
+        return jsonify({"success": False, "message": "Ödəniş məbləği düzgün deyil."}), 400
+    if payment_amount <= 0:
+        return jsonify({"success": False, "message": "Ödəniş məbləği 0-dan böyük olmalıdır."}), 400
+
     cur = conn.cursor()
     try:
         if database_url:
             cur.execute(
                 """
-                UPDATE credit_orders
-                SET status = 'paid', paid_at = CURRENT_TIMESTAMP
+                SELECT total_amount, paid_amount
+                FROM credit_orders
                 WHERE id = %s AND status = 'open'
+                FOR UPDATE
                 """,
                 (order_id,),
             )
         else:
             cur.execute(
                 """
-                UPDATE credit_orders
-                SET status = 'paid', paid_at = CURRENT_TIMESTAMP
+                SELECT total_amount, paid_amount
+                FROM credit_orders
                 WHERE id = ? AND status = 'open'
                 """,
                 (order_id,),
             )
-        if cur.rowcount == 0:
+        order = cur.fetchone()
+        if order is None:
             raise ValueError("Açıq sifariş tapılmadı və ya artıq ödənilib.")
+        total_amount = float(_row_value(order, "total_amount"))
+        paid_amount = float(_row_value(order, "paid_amount"))
+        remaining_amount = round(total_amount - paid_amount, 2)
+        if payment_amount > remaining_amount:
+            raise ValueError(f"Maksimum ödəniş {remaining_amount:.2f} AZN ola bilər.")
+        new_paid_amount = round(paid_amount + payment_amount, 2)
+        is_paid = new_paid_amount >= total_amount
+        if database_url:
+            cur.execute(
+                """
+                UPDATE credit_orders
+                SET paid_amount = %s,
+                    status = CASE WHEN %s >= total_amount THEN 'paid' ELSE 'open' END,
+                    paid_at = CASE WHEN %s >= total_amount THEN CURRENT_TIMESTAMP ELSE paid_at END
+                WHERE id = %s
+                """,
+                (new_paid_amount, new_paid_amount, new_paid_amount, order_id),
+            )
+        else:
+            cur.execute(
+                """
+                UPDATE credit_orders
+                SET paid_amount = ?,
+                    status = CASE WHEN ? >= total_amount THEN 'paid' ELSE 'open' END,
+                    paid_at = CASE WHEN ? >= total_amount THEN CURRENT_TIMESTAMP ELSE paid_at END
+                WHERE id = ?
+                """,
+                (new_paid_amount, new_paid_amount, new_paid_amount, order_id),
+            )
         conn.commit()
-        return jsonify({"success": True, "message": "Sifariş ödənilmiş kimi bağlandı."})
+        return jsonify(
+            {
+                "success": True,
+                "message": "Sifariş tam ödənildi." if is_paid else "Hissəli ödəniş qeydə alındı.",
+                "paid_amount": new_paid_amount,
+                "remaining_amount": round(total_amount - new_paid_amount, 2),
+                "status": "paid" if is_paid else "open",
+            }
+        )
     except ValueError as exc:
         conn.rollback()
         return jsonify({"success": False, "message": str(exc)}), 400
@@ -1598,6 +1829,7 @@ def add_product():
                 else:
                     new_id = row[0]
                 _ensure_category(conn, database_url, category)
+                _audit_event(conn, database_url, "product_created", "product", new_id, name)
                 conn.commit()
                 return jsonify({'success': True, 'id': new_id})
             finally:
@@ -1612,6 +1844,7 @@ def add_product():
                 )
                 new_id = cur.lastrowid
                 _ensure_category(conn, database_url, category)
+                _audit_event(conn, database_url, "product_created", "product", new_id, name)
                 conn.commit()
                 return jsonify({'success': True, 'id': new_id})
             finally:
@@ -1652,6 +1885,7 @@ def update_product(product_id):
                 if cur.rowcount == 0:
                     return jsonify({'success': False, 'message': 'Məhsul tapılmadı'}), 404
                 _ensure_category(conn, database_url, category)
+                _audit_event(conn, database_url, "product_updated", "product", product_id, name)
                 conn.commit()
                 return jsonify({'success': True, 'id': product_id})
             finally:
@@ -1666,6 +1900,7 @@ def update_product(product_id):
                 if cur.rowcount == 0:
                     return jsonify({'success': False, 'message': 'Məhsul tapılmadı'}), 404
                 _ensure_category(conn, database_url, category)
+                _audit_event(conn, database_url, "product_updated", "product", product_id, name)
                 conn.commit()
                 return jsonify({'success': True, 'id': product_id})
             finally:
@@ -1689,6 +1924,7 @@ def delete_product(product_id):
                 cur.execute("DELETE FROM products WHERE id = %s", (product_id,))
                 if cur.rowcount == 0:
                     return jsonify({'success': False, 'message': 'Məhsul tapılmadı'}), 404
+                _audit_event(conn, database_url, "product_deleted", "product", product_id)
                 conn.commit()
                 return jsonify({'success': True})
             finally:
@@ -1701,6 +1937,7 @@ def delete_product(product_id):
                 cur.execute("DELETE FROM products WHERE id = ?", (product_id,))
                 if cur.rowcount == 0:
                     return jsonify({'success': False, 'message': 'Məhsul tapılmadı'}), 404
+                _audit_event(conn, database_url, "product_deleted", "product", product_id)
                 conn.commit()
                 return jsonify({'success': True})
             finally:
@@ -1708,6 +1945,51 @@ def delete_product(product_id):
     except (sqlite3.Error, psycopg2.Error) as exc:
         conn.rollback()
         return jsonify({'success': False, 'message': str(exc)}), 500
+
+
+@app.route("/api/audit-log")
+def audit_log_api():
+    """Return recent audit events for managers."""
+    if session.get("role") != "manager":
+        return jsonify({"success": False, "message": "Bu bölmə yalnız müdir üçündür."}), 403
+    conn = get_db()
+    database_url, _ = get_db_config()
+    cur = conn.cursor()
+    try:
+        if database_url:
+            cur.execute(
+                """
+                SELECT id, actor_role, action, entity_type, entity_id, details, created_at
+                FROM audit_log ORDER BY created_at DESC LIMIT 200
+                """
+            )
+        else:
+            cur.execute(
+                """
+                SELECT id, actor_role, action, entity_type, entity_id, details, created_at
+                FROM audit_log ORDER BY created_at DESC LIMIT 200
+                """
+            )
+        events = cur.fetchall()
+        return jsonify(
+            {
+                "success": True,
+                "events": [
+                    {
+                        "id": _row_value(event, "id"),
+                        "actor_role": _row_value(event, "actor_role"),
+                        "action": _row_value(event, "action"),
+                        "entity_type": _row_value(event, "entity_type"),
+                        "entity_id": _row_value(event, "entity_id"),
+                        "details": _row_value(event, "details"),
+                        "created_at": str(_row_value(event, "created_at")),
+                    }
+                    for event in events
+                ],
+            }
+        )
+    finally:
+        cur.close()
 
 
 @app.route('/api/categories', methods=['POST'])
