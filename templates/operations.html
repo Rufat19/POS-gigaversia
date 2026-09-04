@@ -123,10 +123,10 @@
           <h3 data-i18n="operations.manageProducts">Məhsul idarəetməsi</h3>
           <div id="product-management-list" class="management-list">
             {% for p in products %}
-              <div class="management-row" data-product-id="{{ p[0] }}" data-product-name="{{ p[1] }}" data-product-category="{{ p[2] if p|length > 2 else 'Other' }}" data-product-price="{{ p[3] }}" data-product-stock="{{ p[4] }}" data-product-image="{{ p[5] if p|length > 5 else '' }}">
+            <div class="management-row" data-product-id="{{ p.id }}" data-product-name="{{ p.name }}" data-product-category="{{ p.category if p.category is defined else 'Other' }}" data-product-price="{{ p.price }}" data-product-stock="{{ p.stock }}" data-product-image="{{ p.image_url if p.image_url is defined else '' }}">
                 <div>
-                  <strong>{{ p[1] }}</strong><br>
-                  <span>{{ p[2] }} · {{ p[3] }} AZN · Stok: {{ p[4] }}</span>
+                <strong>{{ p.name }}</strong><br>
+                <span>{{ p.category if p.category is defined else 'Other' }} · {{ p.price }} AZN · Stok: {{ p.stock }}</span>
                 </div>
                 <div class="inline-actions">
                   <button class="btn secondary product-edit-btn" type="button" data-i18n="operations.edit">Edit</button>
@@ -144,7 +144,7 @@
               <span data-i18n="operations.product">Məhsul</span>
               <select id="mov-product">
                 {% for p in products %}
-                  <option value="{{ p[0] }}">{{ p[1] }}</option>
+                  <option value="{{ p.id }}">{{ p.name }}</option>
                 {% endfor %}
               </select>
             </label>
@@ -224,12 +224,12 @@
               </thead>
               <tbody id="history-body">
                 {% for row in history %}
-                  <tr data-date="{{ row[0] }}" data-kind="{{ row[2] }}" data-product="{{ row[1] }}">
-                    <td>{{ row[0] }}</td>
-                    <td>{{ row[1] }}</td>
-                    <td class="kind-{{ row[2] }}">{{ 'Satış' if row[2] == 'sale' else row[2].capitalize() }}</td>
-                    <td class="text-right">{{ row[3] }}</td>
-                    <td class="text-right">{{ row[4] if row[4] is not none else '' }}</td>
+                  <tr data-date="{{ row.created_at }}" data-kind="{{ row.kind }}" data-product="{{ row.product_name }}">
+                    <td>{{ row.created_at }}</td>
+                    <td>{{ row.product_name }}</td>
+                    <td class="kind-{{ row.kind }}">{{ 'Satış' if row.kind == 'sale' else row.kind.capitalize() }}</td>
+                    <td class="text-right">{{ row.quantity }}</td>
+                    <td class="text-right">{{ row.amount if row.amount is not none else '' }}</td>
                   </tr>
                 {% endfor %}
               </tbody>
