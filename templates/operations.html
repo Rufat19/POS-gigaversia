@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Əməliyyatlar - Anbar hərəkətləri</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}?v=20260904-rb19">
   </head>
   <body>
     <div class="page-header">
@@ -26,6 +26,7 @@
         </div>
         <nav class="page-nav">
           <a href="/" data-i18n="nav.products">Məhsullar</a>
+          <a href="/open-orders" data-i18n="nav.openOrders">Açıq qalanlar</a>
           <a href="/operations" class="active" data-i18n="nav.operations">Əməliyyatlar</a>
           <a href="/reports" data-i18n="nav.reports">Hesabatlar</a>
         </nav>
@@ -242,6 +243,7 @@
       const translations = {
         az: {
           'nav.products': 'Məhsullar',
+          'nav.openOrders': 'Açıq qalanlar',
           'nav.operations': 'Əməliyyatlar',
           'nav.reports': 'Hesabatlar',
           'role.manager': 'Müdir',
@@ -311,6 +313,7 @@
         },
         en: {
           'nav.products': 'Products',
+          'nav.openOrders': 'Open orders',
           'nav.operations': 'Operations',
           'nav.reports': 'Reports',
           'role.manager': 'Manager',
@@ -380,6 +383,7 @@
         },
         ru: {
           'nav.products': 'Товары',
+          'nav.openOrders': 'Открытые заказы',
           'nav.operations': 'Операции',
           'nav.reports': 'Отчеты',
           'role.manager': 'Менеджер',
@@ -449,6 +453,7 @@
         },
         tr: {
           'nav.products': 'Ürünler',
+          'nav.openOrders': 'Açık siparişler',
           'nav.operations': 'İşlemler',
           'nav.reports': 'Raporlar',
           'role.manager': 'Yönetici',

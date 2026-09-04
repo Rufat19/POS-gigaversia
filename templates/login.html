@@ -4,12 +4,16 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>POS - Giriş</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}?v=20260904-rb19">
+    <style>
+      /* moved inline styles from .lang-switcher element to avoid inline styling */
+      .lang-switcher.lang-switcher-login { margin: 0 auto 18px; justify-content: center; }
+    </style>
   </head>
   <body>
     <div class="login-shell">
       <div class="login-card">
-        <div class="lang-switcher lang-switcher-login" aria-label="Dil seçimi" style="margin: 0 auto 18px; justify-content: center;">
+        <div class="lang-switcher lang-switcher-login" aria-label="Dil seçimi">
           <label class="lang-select-wrap" for="login-lang-select">
             <span class="sr-only">Dil</span>
             <select id="login-lang-select" class="lang-select" aria-label="Dil seçimi">

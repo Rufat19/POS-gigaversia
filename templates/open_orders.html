@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="az">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Açıq qalanlar</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}?v=20260904-rb19">
+  </head>
+  <body>
+    <div class="page-header">
+      <div class="page-title brand-header">
+        <div class="brand-mark">RB19</div>
+        <p class="page-subtitle">Açıq sifarişlər və borc tarixçəsi</p>
+      </div>
+      <div class="page-actions">
+        <nav class="page-nav">
+          <a href="/" data-i18n="nav.products">Məhsullar</a>
+          <a href="/open-orders" class="active" data-i18n="nav.openOrders">Açıq qalanlar</a>
+          {% if session.get('role') == 'manager' %}
+            <a href="/operations" data-i18n="nav.operations">Əməliyyatlar</a>
+            <a href="/reports" data-i18n="nav.reports">Hesabatlar</a>
+          {% endif %}
+        </nav>
+        <div class="user-chip">
+          <span>{{ 'Müdir' if session.get('role') == 'manager' else 'Satıcı' }}</span>
+          <a href="{{ url_for('logout') }}" class="logout-link">Çıxış</a>
+        </div>
+      </div>
+    </div>
+    <main class="container open-orders-page">
+      <section>
+        <div class="open-orders-heading">
+          <h1>Açıq qalanlar</h1>
+          <a class="btn primary" href="/">Məhsullara qayıt</a>
+        </div>
+        <div id="open-orders-list" class="credit-orders-grid"></div>
+      </section>
+      <section class="paid-orders-section">
+        <h2>Borc tarixçəsi</h2>
+        <div id="paid-orders-list" class="credit-orders-grid"></div>
+      </section>
+    </main>
+    <script>
+      function orderCard(order, isPaid){
+        const items=order.items.map(item=>`<li>${item.name} × ${item.quantity}<strong>${item.line_total.toFixed(2)} AZN</strong></li>`).join('');
+        const action=isPaid
+          ? `<span class="paid-badge">Ödənilib</span>`
+          : `<div class="credit-order-actions"><a class="btn primary" href="/?credit_order=${order.id}">Məhsul əlavə et</a><button class="btn pay-btn" onclick="payOrder(${order.id})">Ödənişi bağla</button></div>`;
+        return `<article class="credit-order-card"><div class="credit-order-top"><div><h3>${escapeHtml(order.customer_name)}</h3><small>${order.created_at}</small></div><strong class="credit-total">${order.total_amount.toFixed(2)} AZN</strong></div><ul>${items}</ul>${action}</article>`;
+      }
+      function escapeHtml(value){ return String(value).replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[ch])); }
+      async function loadOrders(){
+        const response=await fetch('/api/credit-orders');
+        const result=await response.json();
+        if(!response.ok) throw new Error(result.message || 'Sifarişlər yüklənmədi.');
+        const open=result.orders.filter(order=>order.status==='open');
+        const paid=result.orders.filter(order=>order.status==='paid');
+        document.getElementById('open-orders-list').innerHTML=open.length ? open.map(order=>orderCard(order,false)).join('') : '<p class="empty-state">Açıq sifariş yoxdur.</p>';
+        document.getElementById('paid-orders-list').innerHTML=paid.length ? paid.map(order=>orderCard(order,true)).join('') : '<p class="empty-state">Borc tarixçəsi boşdur.</p>';
+      }
+      async function payOrder(orderId){
+        if(!window.confirm('Bu müştərinin hesabı ödənilib?')) return;
+        const response=await fetch(`/api/credit-orders/${orderId}/pay`,{method:'POST'});
+        const result=await response.json();
+        if(!response.ok){ alert(result.message || 'Ödəniş bağlanmadı.'); return; }
+        loadOrders().catch(error=>alert(error.message));
+      }
+      loadOrders().catch(error=>{
+        document.getElementById('open-orders-list').innerHTML=`<p class="error-state">${escapeHtml(error.message)}</p>`;
+      });
+    </script>
+  </body>
+</html>

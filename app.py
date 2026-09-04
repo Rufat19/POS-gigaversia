@@ -9,6 +9,7 @@ import os
 from datetime import datetime, timedelta
 from pathlib import Path
 import sqlite3
+from typing import Any
 
 import psycopg2
 from dotenv import load_dotenv
@@ -277,6 +278,30 @@ def _create_tables_postgres(conn):
             )
             """
         )
+        cur.execute(
+            """
+            CREATE TABLE IF NOT EXISTS credit_orders (
+                id SERIAL PRIMARY KEY,
+                customer_name VARCHAR(200) NOT NULL,
+                status VARCHAR(20) NOT NULL DEFAULT 'open',
+                total_amount NUMERIC(10,2) NOT NULL DEFAULT 0,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                paid_at TIMESTAMP
+            )
+            """
+        )
+        cur.execute(
+            """
+            CREATE TABLE IF NOT EXISTS credit_order_items (
+                id SERIAL PRIMARY KEY,
+                credit_order_id INTEGER NOT NULL REFERENCES credit_orders(id) ON DELETE CASCADE,
+                product_id INTEGER NOT NULL REFERENCES products(id) ON DELETE RESTRICT,
+                quantity INT NOT NULL,
+                unit_price NUMERIC(10,2) NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+            """
+        )
 
         cur.execute("SELECT name FROM products")
         existing_names = set()
@@ -366,6 +391,32 @@ def _create_tables_sqlite(conn):
                 quantity INTEGER NOT NULL,
                 created_at TEXT DEFAULT CURRENT_TIMESTAMP,
                 note TEXT,
+                FOREIGN KEY (product_id) REFERENCES products(id)
+            )
+            """
+        )
+        cur.execute(
+            """
+            CREATE TABLE IF NOT EXISTS credit_orders (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                customer_name TEXT NOT NULL,
+                status TEXT NOT NULL DEFAULT 'open',
+                total_amount REAL NOT NULL DEFAULT 0,
+                created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+                paid_at TEXT
+            )
+            """
+        )
+        cur.execute(
+            """
+            CREATE TABLE IF NOT EXISTS credit_order_items (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                credit_order_id INTEGER NOT NULL,
+                product_id INTEGER NOT NULL,
+                quantity INTEGER NOT NULL,
+                unit_price REAL NOT NULL,
+                created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (credit_order_id) REFERENCES credit_orders(id) ON DELETE CASCADE,
                 FOREIGN KEY (product_id) REFERENCES products(id)
             )
             """
@@ -1140,6 +1191,370 @@ def _checkout_sqlite(conn, cart):
 
     conn.commit()
     return sale_id, round(total_amount, 2)
+
+
+def _credit_order_items(conn, database_url, credit_order_id):
+    """Return item rows for a credit order in display-ready form."""
+    if database_url:
+        cur = conn.cursor()
+        try:
+            cur.execute(
+                """
+                SELECT coi.product_id, p.name, coi.quantity, coi.unit_price,
+                       (coi.quantity * coi.unit_price) AS line_total
+                FROM credit_order_items coi
+                JOIN products p ON p.id = coi.product_id
+                WHERE coi.credit_order_id = %s
+                ORDER BY coi.id
+                """,
+                (credit_order_id,),
+            )
+            return cur.fetchall()
+        finally:
+            cur.close()
+
+    cur = conn.cursor()
+    try:
+        cur.execute(
+            """
+            SELECT coi.product_id, p.name, coi.quantity, coi.unit_price,
+                   (coi.quantity * coi.unit_price) AS line_total
+            FROM credit_order_items coi
+            JOIN products p ON p.id = coi.product_id
+            WHERE coi.credit_order_id = ?
+            ORDER BY coi.id
+            """,
+            (credit_order_id,),
+        )
+        return cur.fetchall()
+    finally:
+        cur.close()
+
+
+def _row_value(row: object, key: str) -> Any:
+    """Read a named column from SQLite rows and PostgreSQL dict rows."""
+    if isinstance(row, sqlite3.Row):
+        return row[key]
+    if isinstance(row, dict):
+        return row[key]
+    raise TypeError("Database row does not support named columns")
+
+
+def _create_credit_order(conn, database_url, customer_name, cart):
+    """Create an open credit order, reserving stock for every cart item."""
+    total_amount = 0.0
+    validated = []
+    if database_url:
+        cur = conn.cursor()
+        try:
+            for item in cart:
+                product_id = item.get("id")
+                quantity = item.get("quantity", 0)
+                if not isinstance(product_id, int) or not isinstance(quantity, int) or quantity < 1:
+                    raise ValueError("Yanlış məhsul məlumatı")
+                cur.execute(
+                    "SELECT id, name, price, stock FROM products WHERE id = %s FOR UPDATE",
+                    (product_id,),
+                )
+                product = cur.fetchone()
+                if product is None:
+                    raise ValueError("Məhsul tapılmadı")
+                if quantity > product["stock"]:
+                    raise ValueError(f"{product['name']} üçün kifayət qədər stok yoxdur.")
+                validated.append((product_id, quantity, product["price"]))
+                total_amount += float(product["price"]) * quantity
+
+            cur.execute(
+                "INSERT INTO credit_orders (customer_name, total_amount) VALUES (%s, %s) RETURNING id",
+                (customer_name, round(total_amount, 2)),
+            )
+            order_id = cur.fetchone()["id"]
+            for product_id, quantity, unit_price in validated:
+                cur.execute(
+                    """
+                    INSERT INTO credit_order_items
+                        (credit_order_id, product_id, quantity, unit_price)
+                    VALUES (%s, %s, %s, %s)
+                    """,
+                    (order_id, product_id, quantity, unit_price),
+                )
+                cur.execute(
+                    "UPDATE products SET stock = stock - %s WHERE id = %s",
+                    (quantity, product_id),
+                )
+            conn.commit()
+            return order_id, round(total_amount, 2)
+        finally:
+            cur.close()
+
+    for item in cart:
+        product_id = item.get("id")
+        quantity = item.get("quantity", 0)
+        if not isinstance(product_id, int) or not isinstance(quantity, int) or quantity < 1:
+            raise ValueError("Yanlış məhsul məlumatı")
+        product = conn.execute(
+            "SELECT id, name, price, stock FROM products WHERE id = ?",
+            (product_id,),
+        ).fetchone()
+        if product is None:
+            raise ValueError("Məhsul tapılmadı")
+        if quantity > product["stock"]:
+            raise ValueError(f"{product['name']} üçün kifayət qədər stok yoxdur.")
+        validated.append((product_id, quantity, product["price"]))
+        total_amount += float(product["price"]) * quantity
+
+    cursor = conn.cursor()
+    cursor.execute(
+        "INSERT INTO credit_orders (customer_name, total_amount) VALUES (?, ?)",
+        (customer_name, round(total_amount, 2)),
+    )
+    order_id = cursor.lastrowid
+    for product_id, quantity, unit_price in validated:
+        cursor.execute(
+            """
+            INSERT INTO credit_order_items
+                (credit_order_id, product_id, quantity, unit_price)
+            VALUES (?, ?, ?, ?)
+            """,
+            (order_id, product_id, quantity, unit_price),
+        )
+        conn.execute(
+            "UPDATE products SET stock = stock - ? WHERE id = ?",
+            (quantity, product_id),
+        )
+    conn.commit()
+    return order_id, round(total_amount, 2)
+
+
+@app.route("/open-orders")
+def open_orders_page():
+    """Render open credit orders and the paid credit-order history."""
+    init_db()
+    return render_template("open_orders.html")
+
+
+@app.route("/api/credit-orders", methods=["GET", "POST"])
+def credit_orders_api():
+    """List credit orders or create a new open order from a cart."""
+    conn = get_db()
+    database_url, _ = get_db_config()
+    if request.method == "POST":
+        data = request.get_json(silent=True) or {}
+        customer_name = str(data.get("customer_name", "")).strip()
+        cart = data.get("cart", [])
+        if not customer_name:
+            return jsonify({"success": False, "message": "Müştərinin adı vacibdir."}), 400
+        if len(customer_name) > 200:
+            return jsonify({"success": False, "message": "Müştəri adı çox uzundur."}), 400
+        if not isinstance(cart, list) or not cart:
+            return jsonify({"success": False, "message": "Səbət boşdur."}), 400
+        try:
+            order_id, total = _create_credit_order(conn, database_url, customer_name, cart)
+            return jsonify(
+                {"success": True, "id": order_id, "total": total, "message": "Açıq sifariş saxlanıldı."}
+            )
+        except ValueError as exc:
+            conn.rollback()
+            return jsonify({"success": False, "message": str(exc)}), 400
+        except (sqlite3.Error, psycopg2.Error) as exc:
+            conn.rollback()
+            return jsonify({"success": False, "message": f"Sifariş saxlanarkən xəta: {exc}"}), 500
+
+    if database_url:
+        cur = conn.cursor()
+        try:
+            cur.execute(
+                """
+                SELECT id, customer_name, status, total_amount, created_at, paid_at
+                FROM credit_orders
+                ORDER BY CASE WHEN status = 'open' THEN 0 ELSE 1 END, created_at DESC
+                """
+            )
+            orders = cur.fetchall()
+        finally:
+            cur.close()
+    else:
+        cur = conn.cursor()
+        try:
+            cur.execute(
+                """
+                SELECT id, customer_name, status, total_amount, created_at, paid_at
+                FROM credit_orders
+                ORDER BY CASE WHEN status = 'open' THEN 0 ELSE 1 END, created_at DESC
+                """
+            )
+            orders = cur.fetchall()
+        finally:
+            cur.close()
+
+    result = []
+    for order in orders:
+        order_id = _row_value(order, "id")
+        result.append(
+            {
+                "id": order_id,
+                "customer_name": _row_value(order, "customer_name"),
+                "status": _row_value(order, "status"),
+                "total_amount": float(_row_value(order, "total_amount")),
+                "created_at": str(_row_value(order, "created_at")),
+                "paid_at": (
+                    str(_row_value(order, "paid_at"))
+                    if _row_value(order, "paid_at")
+                    else None
+                ),
+                "items": [
+                    {
+                        "product_id": _row_value(item, "product_id"),
+                        "name": _row_value(item, "name"),
+                        "quantity": _row_value(item, "quantity"),
+                        "unit_price": float(_row_value(item, "unit_price")),
+                        "line_total": float(_row_value(item, "line_total")),
+                    }
+                    for item in _credit_order_items(conn, database_url, order_id)
+                ],
+            }
+        )
+    return jsonify({"success": True, "orders": result})
+
+
+@app.route("/api/credit-orders/<int:order_id>/items", methods=["POST"])
+def add_credit_order_items(order_id):
+    """Add more products to an existing open credit order."""
+    data = request.get_json(silent=True) or {}
+    cart = data.get("cart", [])
+    if not isinstance(cart, list) or not cart:
+        return jsonify({"success": False, "message": "Səbət boşdur."}), 400
+
+    conn = get_db()
+    database_url, _ = get_db_config()
+    cur = conn.cursor()
+    try:
+        if database_url:
+            cur.execute("SELECT status FROM credit_orders WHERE id = %s FOR UPDATE", (order_id,))
+            order = cur.fetchone()
+        else:
+            cur.execute("SELECT status FROM credit_orders WHERE id = ?", (order_id,))
+            order = cur.fetchone()
+        if order is None:
+            raise ValueError("Açıq sifariş tapılmadı.")
+        if _row_value(order, "status") != "open":
+            raise ValueError("Ödənilmiş sifarişə məhsul əlavə etmək olmaz.")
+
+        total = 0.0
+        validated = []
+        for item in cart:
+            product_id = item.get("id")
+            quantity = item.get("quantity", 0)
+            if not isinstance(product_id, int) or not isinstance(quantity, int) or quantity < 1:
+                raise ValueError("Yanlış məhsul məlumatı")
+            if database_url:
+                cur.execute(
+                    "SELECT id, name, price, stock FROM products WHERE id = %s FOR UPDATE",
+                    (product_id,),
+                )
+                product = cur.fetchone()
+            else:
+                cur.execute(
+                    "SELECT id, name, price, stock FROM products WHERE id = ?",
+                    (product_id,),
+                )
+                product = cur.fetchone()
+            if product is None:
+                raise ValueError("Məhsul tapılmadı")
+            if quantity > _row_value(product, "stock"):
+                raise ValueError(
+                    f"{_row_value(product, 'name')} üçün kifayət qədər stok yoxdur."
+                )
+            unit_price = _row_value(product, "price")
+            validated.append((product_id, quantity, unit_price))
+            total += float(unit_price) * quantity
+
+        for product_id, quantity, unit_price in validated:
+            if database_url:
+                cur.execute(
+                    """
+                    INSERT INTO credit_order_items
+                        (credit_order_id, product_id, quantity, unit_price)
+                    VALUES (%s, %s, %s, %s)
+                    """,
+                    (order_id, product_id, quantity, unit_price),
+                )
+                cur.execute(
+                    "UPDATE products SET stock = stock - %s WHERE id = %s",
+                    (quantity, product_id),
+                )
+            else:
+                cur.execute(
+                    """
+                    INSERT INTO credit_order_items
+                        (credit_order_id, product_id, quantity, unit_price)
+                    VALUES (?, ?, ?, ?)
+                    """,
+                    (order_id, product_id, quantity, unit_price),
+                )
+                cur.execute(
+                    "UPDATE products SET stock = stock - ? WHERE id = ?",
+                    (quantity, product_id),
+                )
+        if database_url:
+            cur.execute(
+                "UPDATE credit_orders SET total_amount = total_amount + %s WHERE id = %s",
+                (round(total, 2), order_id),
+            )
+        else:
+            cur.execute(
+                "UPDATE credit_orders SET total_amount = total_amount + ? WHERE id = ?",
+                (round(total, 2), order_id),
+            )
+        conn.commit()
+        return jsonify({"success": True, "total_added": round(total, 2)})
+    except ValueError as exc:
+        conn.rollback()
+        return jsonify({"success": False, "message": str(exc)}), 400
+    except (sqlite3.Error, psycopg2.Error) as exc:
+        conn.rollback()
+        return jsonify({"success": False, "message": f"Sifariş yenilənərkən xəta: {exc}"}), 500
+    finally:
+        cur.close()
+
+
+@app.route("/api/credit-orders/<int:order_id>/pay", methods=["POST"])
+def pay_credit_order(order_id):
+    """Close an open credit order and preserve it in paid history."""
+    conn = get_db()
+    database_url, _ = get_db_config()
+    cur = conn.cursor()
+    try:
+        if database_url:
+            cur.execute(
+                """
+                UPDATE credit_orders
+                SET status = 'paid', paid_at = CURRENT_TIMESTAMP
+                WHERE id = %s AND status = 'open'
+                """,
+                (order_id,),
+            )
+        else:
+            cur.execute(
+                """
+                UPDATE credit_orders
+                SET status = 'paid', paid_at = CURRENT_TIMESTAMP
+                WHERE id = ? AND status = 'open'
+                """,
+                (order_id,),
+            )
+        if cur.rowcount == 0:
+            raise ValueError("Açıq sifariş tapılmadı və ya artıq ödənilib.")
+        conn.commit()
+        return jsonify({"success": True, "message": "Sifariş ödənilmiş kimi bağlandı."})
+    except ValueError as exc:
+        conn.rollback()
+        return jsonify({"success": False, "message": str(exc)}), 400
+    except (sqlite3.Error, psycopg2.Error) as exc:
+        conn.rollback()
+        return jsonify({"success": False, "message": f"Ödəniş bağlanarkən xəta: {exc}"}), 500
+    finally:
+        cur.close()
 
 
 @app.route('/add_product', methods=['POST'])

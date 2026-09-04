@@ -1,6 +1,6 @@
 # RB19 POS - Kiosk, Kafe, Kiçik restoran və Anbar sistemi
 
-Kiçik biznes üçün hazırlanmış, toxunma-dostu (touch-friendly) satış nöqtəsi (POS) sistemi. Flask (Python) və PostgreSQL üzərində qurulub, Railway-də deploy edilir.
+Kiçik biznes üçün hazırlanmış, toxunma-dostu (touch-friendly) satış nöqtəsi (POS) sistemi. Flask (Python) və PostgreSQL/SQLite üzərində qurulub, Railway-də deploy edilə bilər.
 
 ## Texnologiyalar
 
@@ -17,33 +17,35 @@ Kiçik biznes üçün hazırlanmış, toxunma-dostu (touch-friendly) satış nö
 - Toxunma-dostu interfeys, miqdar seçimi ilə səbətə əlavə etmə
 - Səbətdə real-vaxt cəm hesablama
 - Satışı təsdiqləmə - stok avtomatik azalır
+- Azərbaycan, İngilis, Rus və Türk dilləri arasında keçid
 
-### 2. Əməliyyatlar (Transactions)
+### 2. Açıq qalanlar / Nisyə sifarişlər
+- Səbətdəki məhsulları müştərinin adı ilə açıq sifariş kimi saxlamaq
+- Sonrakı səfərdə həmin müştərinin sifarişinə yeni məhsullar əlavə etmək
+- Açıq sifariş bağlananda onu ödənilmiş borc tarixçəsində saxlamaq
+- Açıq nisyə sifariş yaradılarkən və yenilənərkən stokun avtomatik azaldılması
+
+### 3. Əməliyyatlar (Transactions)
 - Bütün satışlar, daxilolmalar (məhsul girişi) və itkilər (zay/xarab olma) bir tarixçədə
 - Daxilolma qeyd ediləndə əlaqəli məhsulun stoku artır
 - İtki qeyd ediləndə stok azalır, mövcud stokdan çox miqdara icazə verilmir
 
-### 3. Hesabatlar
+### 4. Hesabatlar
 - Tarix aralığı seçimi ilə filtrlənən analitika
 - Ən çox / ən az satılan məhsullar
 - Kateqoriya üzrə satış payı (pie chart)
 - Gün üzrə satış məbləği (bar chart)
 - Top 5 məhsul (bar chart)
 
-### 4. Rol-əsaslı giriş sistemi
-5 rəqəmli PIN kodları ilə üç səlahiyyət səviyyəsi:
+### 5. Rol-əsaslı giriş sistemi
+4 rəqəmli PIN kodları ilə iki səlahiyyət səviyyəsi:
 
 | Rol | Giriş imkanları |
 |---|---|
 | Satıcı | Yalnız POS/Kiosk |
 | Müdir | POS + Məhsul əlavə etmə + Əməliyyatlar + Hesabatlar |
-| Admin | Tam giriş (aşağıdakı admin panel daxil) |
 
-### 5. Admin Paneli
-- Sayt görünüşünü dəyişmək (banner şəkil, başlıq, alt yazı)
-- Məhsulları redaktə/silmək (ad, qiymət, stok, kateqoriya, şəkil)
-- Rolların PIN kodlarını idarə etmək
-- Əməliyyat/tarixçə sıfırlama və təmizlik
+Hazırkı PIN-lər `app.py` daxilində `PIN_USERS` xəritəsində təyin olunur. Production mühitində onları dəyişmək tövsiyə edilir.
 
 ## Layihəni lokal işə salmaq
 
@@ -52,7 +54,8 @@ Kiçik biznes üçün hazırlanmış, toxunma-dostu (touch-friendly) satış nö
 pip install -r requirements.txt
 
 # .env faylını yarat (.env.example-a bax)
-# DATABASE_URL, SATICI_PIN, MUDIR_PIN, ADMIN_PIN dəyərlərini təyin et
+# Production üçün DATABASE_URL təyin et.
+# DATABASE_URL yoxdursa, SQLITE_DB_PATH ilə lokal SQLite istifadə olunur.
 
 # Tətbiqi işə sal
 python app.py
@@ -64,8 +67,25 @@ Brauzerdə aç: `http://127.0.0.1:5000`
 
 1. Railway-də yeni layihə yarat, GitHub repository-ni qoş
 2. `+ New → Database → PostgreSQL` ilə baza əlavə et
-3. `DATABASE_URL` və PIN dəyişənlərini **Variables** bölməsində təyin et
+3. `DATABASE_URL` və `PORT` dəyişənlərini **Variables** bölməsində təyin et
 4. Deploy et
+
+`Procfile` Railway üçün Gunicorn başlanğıc əmrini təqdim edir:
+
+```text
+web: gunicorn -w 4 -b 0.0.0.0:$PORT app:app
+```
+
+## Verilənlər bazası
+
+İlk sorğuda cədvəllər avtomatik yaradılır. Əsas cədvəllər:
+
+- `products`, `categories`
+- `sales`, `sale_items`
+- `stock_movements`
+- `credit_orders`, `credit_order_items`
+
+`DATABASE_URL` olduqda PostgreSQL, olmadıqda `SQLITE_DB_PATH` (default: `app.db`) istifadə edilir.
 
 ## Qeyd
 

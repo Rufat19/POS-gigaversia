@@ -4,14 +4,14 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>POS - Məhsul siyahısı</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}?v=20260904-rb19">
 
   </head>
   <body>
     <div class="page-header">
-      <div class="page-title">
-        <h1>POS Kiosk</h1>
-        <p class="page-subtitle">Müştəri sifarişləri üçün professional POS təcrübəsi</p>
+      <div class="page-title brand-header">
+        <div class="brand-mark">RB19</div>
+        <p class="page-subtitle">Premium POS — daha sürətli seçim, daha keyfiyyətli xidmət</p>
       </div>
       <div class="page-actions">
         <div class="lang-switcher" aria-label="Dil seçimi">
@@ -27,6 +27,7 @@
         </div>
         <nav class="page-nav">
           <a href="/" class="active" data-i18n="nav.products">Məhsullar</a>
+          <a href="/open-orders" data-i18n="nav.openOrders">Açıq qalanlar</a>
           {% if session.get('role') == 'manager' %}
             <a href="/operations" data-i18n="nav.operations">Əməliyyatlar</a>
             <a href="/reports" data-i18n="nav.reports">Hesabatlar</a>
@@ -52,6 +53,7 @@
             <button class="checkout-btn" type="button" onclick="checkout()" data-i18n="cart.checkout">Satışı təsdiqlə</button>
             <button class="clear-btn" type="button" onclick="cart.length=0; renderCart();" data-i18n="cart.clear">Təmizlə</button>
           </div>
+          <button class="credit-btn" type="button" onclick="saveAsOpenOrder()" data-i18n="cart.keepOpen">Açıq saxla</button>
           <div id="checkout-message" class="checkout-message"></div>
         </div>
       </aside>
@@ -104,6 +106,7 @@
       const translations = {
         az: {
           'nav.products': 'Məhsullar',
+          'nav.openOrders': 'Açıq qalanlar',
           'nav.operations': 'Əməliyyatlar',
           'nav.reports': 'Hesabatlar',
           'role.seller': 'Satıcı',
@@ -120,6 +123,9 @@
           'cart.total': 'Ümumi məbləğ: ',
           'cart.checkout': 'Satışı təsdiqlə',
           'cart.clear': 'Təmizlə',
+          'cart.keepOpen': 'Açıq saxla',
+          'credit.customerPrompt': 'Müştərinin adını yazın:',
+          'credit.saved': 'Açıq sifariş saxlanıldı.',
           'alert.minQty': 'Miqdar 1-dən az ola bilməz.',
           'alert.stock': 'Seçilən miqdar mövcud stokdan çoxdur.',
           'alert.emptyCart': 'Səbət boşdur.',
@@ -129,6 +135,7 @@
         },
         en: {
           'nav.products': 'Products',
+          'nav.openOrders': 'Open orders',
           'nav.operations': 'Operations',
           'nav.reports': 'Reports',
           'role.seller': 'Seller',
@@ -145,6 +152,9 @@
           'cart.total': 'Total: ',
           'cart.checkout': 'Confirm sale',
           'cart.clear': 'Clear',
+          'cart.keepOpen': 'Keep open',
+          'credit.customerPrompt': 'Enter the customer name:',
+          'credit.saved': 'Open order saved.',
           'alert.minQty': 'Quantity cannot be less than 1.',
           'alert.stock': 'Selected quantity exceeds available stock.',
           'alert.emptyCart': 'Cart is empty.',
@@ -154,6 +164,7 @@
         },
         ru: {
           'nav.products': 'Товары',
+          'nav.openOrders': 'Открытые заказы',
           'nav.operations': 'Операции',
           'nav.reports': 'Отчеты',
           'role.seller': 'Продавец',
@@ -170,6 +181,9 @@
           'cart.total': 'Итого: ',
           'cart.checkout': 'Подтвердить продажу',
           'cart.clear': 'Очистить',
+          'cart.keepOpen': 'Оставить открытым',
+          'credit.customerPrompt': 'Введите имя клиента:',
+          'credit.saved': 'Открытый заказ сохранен.',
           'alert.minQty': 'Количество не может быть меньше 1.',
           'alert.stock': 'Выбранное количество превышает доступный остаток.',
           'alert.emptyCart': 'Корзина пуста.',
@@ -179,6 +193,7 @@
         },
         tr: {
           'nav.products': 'Ürünler',
+          'nav.openOrders': 'Açık siparişler',
           'nav.operations': 'İşlemler',
           'nav.reports': 'Raporlar',
           'role.seller': 'Satıcı',
@@ -195,6 +210,9 @@
           'cart.total': 'Toplam: ',
           'cart.checkout': 'Satışı onayla',
           'cart.clear': 'Temizle',
+          'cart.keepOpen': 'Açık tut',
+          'credit.customerPrompt': 'Müşteri adını yazın:',
+          'credit.saved': 'Açık sipariş kaydedildi.',
           'alert.minQty': 'Miktar 1\'den küçük olamaz.',
           'alert.stock': 'Seçilen miktar mevcut stoktan fazladır.',
           'alert.emptyCart': 'Sepet boş.',
@@ -207,6 +225,7 @@
       let activeCategory = 'All';
       let searchTerm = '';
       let currentLang = localStorage.getItem('pos_lang') || 'az';
+      const openOrderId = new URLSearchParams(window.location.search).get('credit_order');
 
       function applyLanguage(lang) {
         currentLang = lang in translations ? lang : 'az';
@@ -333,6 +352,60 @@
           cart.forEach(item=>{ const stockEl=document.getElementById('stock-'+item.id); if(stockEl){ const current=Number(stockEl.textContent||0); stockEl.textContent=Math.max(0,current-item.quantity); } });
          try{ printReceipt(result, cart); }catch(e){ console.error('Print error',e); }
          cart.length=0; renderCart();
+       }catch(err){ messageBox.textContent=err.message; }
+      }
+
+      async function saveAsOpenOrder(){
+       if(cart.length===0){ alert(translations[currentLang]['alert.emptyCart']); return; }
+       if(openOrderId){
+         await addToOpenOrder(openOrderId);
+         return;
+       }
+       const customerName = window.prompt(translations[currentLang]['credit.customerPrompt']);
+       if(customerName === null) return;
+       const name = customerName.trim();
+       if(!name){ alert(translations[currentLang]['credit.customerPrompt']); return; }
+       const messageBox=document.getElementById('checkout-message');
+       messageBox.textContent=translations[currentLang]['checkout.processing'];
+       try{
+         const response = await fetch('/api/credit-orders',{
+           method:'POST',
+           headers:{'Content-Type':'application/json'},
+           body:JSON.stringify({customer_name:name, cart})
+         });
+         const result = await response.json();
+         if(!response.ok) throw new Error(result.message || translations[currentLang]['checkout.defaultError']);
+         messageBox.textContent=result.message || translations[currentLang]['credit.saved'];
+         cart.forEach(item=>{
+           const stockEl=document.getElementById('stock-'+item.id);
+           if(stockEl){
+             const current=Number(stockEl.textContent||0);
+             stockEl.textContent=Math.max(0,current-item.quantity);
+           }
+         });
+         cart.length=0;
+         renderCart();
+       }catch(err){ messageBox.textContent=err.message; }
+      }
+
+      async function addToOpenOrder(orderId){
+       const messageBox=document.getElementById('checkout-message');
+       messageBox.textContent=translations[currentLang]['checkout.processing'];
+       try{
+         const response = await fetch(`/api/credit-orders/${encodeURIComponent(orderId)}/items`,{
+           method:'POST',
+           headers:{'Content-Type':'application/json'},
+           body:JSON.stringify({cart})
+         });
+         const result=await response.json();
+         if(!response.ok) throw new Error(result.message || translations[currentLang]['checkout.defaultError']);
+         messageBox.textContent=result.message || translations[currentLang]['credit.saved'];
+         cart.forEach(item=>{
+           const stockEl=document.getElementById('stock-'+item.id);
+           if(stockEl) stockEl.textContent=Math.max(0,Number(stockEl.textContent||0)-item.quantity);
+         });
+         cart.length=0;
+         renderCart();
        }catch(err){ messageBox.textContent=err.message; }
       }
 
