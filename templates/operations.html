@@ -123,10 +123,10 @@
           <h3 data-i18n="operations.manageProducts">Məhsul idarəetməsi</h3>
           <div id="product-management-list" class="management-list">
             {% for p in products %}
-            <div class="management-row" data-product-id="{{ p.id }}" data-product-name="{{ p.name }}" data-product-category="{{ p.category if p.category is defined else 'Other' }}" data-product-price="{{ p.price }}" data-product-stock="{{ p.stock }}" data-product-image="{{ p.image_url if p.image_url is defined else '' }}">
+            <div class="management-row" data-product-id="{{ p.id }}" data-product-name="{{ p.name }}" data-product-category="{{ p.category }}" data-product-price="{{ p.price }}" data-product-stock="{{ p.stock }}" data-product-image="{{ p.image_url or '' }}">
                 <div>
                 <strong>{{ p.name }}</strong><br>
-                <span>{{ p.category if p.category is defined else 'Other' }} · {{ p.price }} AZN · Stok: {{ p.stock }}</span>
+                <span>{{ p.category }} · {{ p.price }} AZN · Stok: {{ p.stock }}</span>
                 </div>
                 <div class="inline-actions">
                   <button class="btn secondary product-edit-btn" type="button" data-i18n="operations.edit">Edit</button>

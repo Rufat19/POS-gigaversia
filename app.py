@@ -724,14 +724,20 @@ def operations_page():
     if database_url:
         cur = conn.cursor()
         try:
-            cur.execute("SELECT id, name FROM products ORDER BY name")
+            cur.execute(
+                "SELECT id, name, category, price, stock, image_url "
+                "FROM products ORDER BY name"
+            )
             products = cur.fetchall()
         finally:
             cur.close()
     else:
         cur = conn.cursor()
         try:
-            cur.execute("SELECT id, name FROM products ORDER BY name")
+            cur.execute(
+                "SELECT id, name, category, price, stock, image_url "
+                "FROM products ORDER BY name"
+            )
             products = cur.fetchall()
         finally:
             cur.close()
