@@ -560,7 +560,10 @@ def _sync_categories(conn, database_url):
                 """
             )
             cur.execute("SELECT DISTINCT category FROM products WHERE category IS NOT NULL")
-            existing = {row[0] for row in cur.fetchall() if row and row[0]}
+            existing = {
+                row["category"] for row in cur.fetchall()
+                if row and row["category"]
+            }
             for name in sorted(existing):
                 cur.execute(
                     "INSERT INTO categories (name) VALUES (%s) ON CONFLICT (name) DO NOTHING",
@@ -569,7 +572,7 @@ def _sync_categories(conn, database_url):
             cur.execute(
                 "SELECT name FROM categories WHERE name NOT IN (SELECT DISTINCT category FROM products WHERE category IS NOT NULL)"
             )
-            orphan_names = [row[0] for row in cur.fetchall()]
+            orphan_names = [row["name"] for row in cur.fetchall()]
             for name in orphan_names:
                 cur.execute("DELETE FROM categories WHERE name = %s", (name,))
             conn.commit()
@@ -634,11 +637,17 @@ def _get_categories(conn, database_url):
         cur = conn.cursor()
         try:
             cur.execute("SELECT name FROM categories ORDER BY name")
-            categories = [row[0] for row in cur.fetchall() if row and row[0]]
+            categories = [
+                row["name"] for row in cur.fetchall()
+                if row and row["name"]
+            ]
             if categories:
                 return categories
             cur.execute("SELECT DISTINCT category FROM products WHERE category IS NOT NULL ORDER BY category")
-            return [row[0] for row in cur.fetchall() if row and row[0]]
+            return [
+                row["category"] for row in cur.fetchall()
+                if row and row["category"]
+            ]
         finally:
             cur.close()
 
