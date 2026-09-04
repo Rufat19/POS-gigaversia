@@ -30,11 +30,29 @@ load_dotenv()
 
 app = Flask(__name__)
 app.config["JSON_SORT_KEYS"] = False
-app.config["SECRET_KEY"] = os.getenv("SECRET_KEY", "pos-pin-key-2026")
+database_url = os.getenv("DATABASE_URL")
+secret_key = os.getenv("SECRET_KEY")
+seller_pin = os.getenv("SELLER_PIN")
+manager_pin = os.getenv("MANAGER_PIN")
+is_production = bool(
+    os.getenv("RAILWAY_ENVIRONMENT")
+    or os.getenv("RAILWAY_PROJECT_ID")
+    or os.getenv("FLASK_ENV") == "production"
+)
+
+if is_production and not all((secret_key, seller_pin, manager_pin)):
+    raise RuntimeError(
+        "SECRET_KEY, SELLER_PIN and MANAGER_PIN must be configured in production."
+    )
+
+app.config["SECRET_KEY"] = secret_key or "local-development-only-secret"
+app.config["SESSION_COOKIE_HTTPONLY"] = True
+app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
+app.config["SESSION_COOKIE_SECURE"] = is_production
 
 PIN_USERS = {
-    os.getenv("SELLER_PIN", "1111"): "seller",
-    os.getenv("MANAGER_PIN", "1991"): "manager",
+    seller_pin or "1111": "seller",
+    manager_pin or "1991": "manager",
 }
 
 DEFAULT_PRODUCTS = [

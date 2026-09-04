@@ -45,7 +45,7 @@ Kiçik biznes üçün hazırlanmış, toxunma-dostu (touch-friendly) satış nö
 | Satıcı | Yalnız POS/Kiosk |
 | Müdir | POS + Məhsul əlavə etmə + Əməliyyatlar + Hesabatlar |
 
-Hazırkı PIN-lər `app.py` daxilində `PIN_USERS` xəritəsində təyin olunur. Production mühitində onları dəyişmək tövsiyə edilir.
+PIN-lər production mühitində yalnız Railway Variables bölməsindən verilməlidir.
 PIN-lər artıq `.env` dəyişənlərindən oxunur:
 
 - `SELLER_PIN`
@@ -78,10 +78,17 @@ Brauzerdə aç: `http://127.0.0.1:5000`
 
 ## Deploy (Railway)
 
-1. Railway-də yeni layihə yarat, GitHub repository-ni qoş
-2. `+ New → Database → PostgreSQL` ilə baza əlavə et
-3. `DATABASE_URL` və `PORT` dəyişənlərini **Variables** bölməsində təyin et
-4. Deploy et
+1. Railway-də yeni layihə yarat və GitHub repository-ni qoş.
+2. `+ New → Database → PostgreSQL` ilə PostgreSQL servisi əlavə et.
+3. Tətbiq servisinin **Variables** bölməsində PostgreSQL bağlantı dəyişənini əlavə et. Railway-də bağlantı URL-i adətən PostgreSQL servisindən `${{Postgres.DATABASE_URL}}` reference kimi seçilir.
+4. Bu dəyişənləri də əlavə et:
+   - `SECRET_KEY`: uzun, təsadüfi, ən azı 32 simvolluq dəyər
+   - `SELLER_PIN`: yalnız satıcının bildiyi yeni PIN
+   - `MANAGER_PIN`: satıcı PIN-indən fərqli, yeni rəhbər PIN-i
+5. `FLASK_DEBUG` dəyişənini əlavə etmə və production-da `True` etmə.
+6. Deploy et və Railway-in verdiyi public domain üzərindən giriş səhifəsini yoxla.
+
+`DATABASE_URL`, `SECRET_KEY` və PIN-ləri GitHub-a, README-yə və ya source fayllarına yazma. Bu dəyişənlər yalnız Railway Variables bölməsində saxlanmalıdır.
 
 `Procfile` Railway üçün Gunicorn başlanğıc əmrini təqdim edir:
 
