@@ -139,6 +139,66 @@
         </section>
 
         <section class="card operations-card">
+          <h3>Masaların idarə edilməsi</h3>
+          <div class="form-grid">
+            <label class="form-group">
+              <span>Yeni masa adı</span>
+              <input id="new-table-name" placeholder="Məs. VIP masa">
+            </label>
+            <label class="form-group">
+              <span>Masa kateqoriyası</span>
+              <select id="new-table-category">
+                {% for category in table_categories %}
+                  <option value="{{ category }}">{{ category }}</option>
+                {% endfor %}
+              </select>
+            </label>
+            <div class="form-actions">
+              <button id="add-table-btn" class="add-btn" type="button">Masa əlavə et</button>
+              <div id="table-msg" class="form-message"></div>
+            </div>
+          </div>
+          <div class="form-grid" style="margin-top:18px;">
+            <label class="form-group">
+              <span>Yeni masa kateqoriyası</span>
+              <input id="new-table-category-name" placeholder="Məs. VIP">
+            </label>
+            <div class="form-actions">
+              <button id="add-table-category-btn" class="add-btn" type="button">Kateqoriya əlavə et</button>
+            </div>
+          </div>
+          <div class="form-grid" style="margin-top:18px;">
+            <label class="form-group">
+              <span>Dəyişdiriləcək kateqoriya</span>
+              <select id="rename-table-category">
+                {% for category in table_categories %}
+                  <option value="{{ category }}">{{ category }}</option>
+                {% endfor %}
+              </select>
+            </label>
+            <label class="form-group">
+              <span>Yeni kateqoriya adı</span>
+              <input id="rename-table-category-name" placeholder="Yeni ad">
+            </label>
+            <div class="form-actions">
+              <button id="rename-table-category-btn" class="btn secondary" type="button">Dəyişdir</button>
+              <button id="delete-table-category-btn" class="btn danger" type="button">Sil</button>
+            </div>
+          </div>
+          <div class="management-list table-management-list">
+            {% for table in dining_tables %}
+              <div class="management-row" data-table-number="{{ table.table_number }}" data-table-name="{{ table.name }}" data-table-category="{{ table.category }}">
+                <div><strong>{{ table.name }}</strong><br><span>#{{ table.table_number }} · {{ table.category }}</span></div>
+                <div class="inline-actions">
+                  <button class="btn secondary table-edit-btn" type="button">Dəyişdir</button>
+                  <button class="btn danger table-delete-btn" type="button">Sil</button>
+                </div>
+              </div>
+            {% endfor %}
+          </div>
+        </section>
+
+        <section class="card operations-card">
           <h3 data-i18n="operations.stockMovement">Daxilolma / İtki əlavə et</h3>
           <div class="form-grid">
             <label class="form-group">
@@ -789,6 +849,63 @@
           location.reload();
         } catch(e){ msg.textContent='Xəta: '+e.message; }
       });
+
+      async function tableRequest(url, options = {}) {
+        const response = await fetch(url, options);
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.message || 'Masa əməliyyatı uğursuz oldu.');
+        return data;
+      }
+      document.getElementById('add-table-btn').addEventListener('click', async () => {
+        const name = document.getElementById('new-table-name').value.trim();
+        const category = document.getElementById('new-table-category').value;
+        try {
+          await tableRequest('/api/dining-tables', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({name, category})});
+          location.reload();
+        } catch (error) { document.getElementById('table-msg').textContent = 'Xəta: ' + error.message; }
+      });
+      document.getElementById('add-table-category-btn').addEventListener('click', async () => {
+        const name = document.getElementById('new-table-category-name').value.trim();
+        try {
+          await tableRequest('/api/table-categories', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({name})});
+          location.reload();
+        } catch (error) { document.getElementById('table-msg').textContent = 'Xəta: ' + error.message; }
+      });
+      document.getElementById('rename-table-category-btn').addEventListener('click', async () => {
+        const oldName = document.getElementById('rename-table-category').value;
+        const newName = document.getElementById('rename-table-category-name').value.trim();
+        try {
+          await tableRequest(`/api/table-categories/${encodeURIComponent(oldName)}`, {method:'PUT', headers:{'Content-Type':'application/json'}, body:JSON.stringify({new_name:newName})});
+          location.reload();
+        } catch (error) { document.getElementById('table-msg').textContent = 'Xəta: ' + error.message; }
+      });
+      document.getElementById('delete-table-category-btn').addEventListener('click', async () => {
+        const name = document.getElementById('rename-table-category').value;
+        if (!name || !confirm(`${name} kateqoriyası silinsin?`)) return;
+        try {
+          await tableRequest(`/api/table-categories/${encodeURIComponent(name)}`, {method:'DELETE'});
+          location.reload();
+        } catch (error) { document.getElementById('table-msg').textContent = 'Xəta: ' + error.message; }
+      });
+      document.querySelectorAll('.table-edit-btn').forEach(button => button.addEventListener('click', async () => {
+        const row = button.closest('.management-row');
+        const name = prompt('Masa adı:', row.dataset.tableName);
+        if (name === null) return;
+        const category = prompt('Masa kateqoriyası:', row.dataset.tableCategory);
+        if (category === null) return;
+        try {
+          await tableRequest(`/api/dining-tables/${row.dataset.tableNumber}`, {method:'PUT', headers:{'Content-Type':'application/json'}, body:JSON.stringify({name:name.trim(), category:category.trim()})});
+          location.reload();
+        } catch (error) { alert(error.message); }
+      }));
+      document.querySelectorAll('.table-delete-btn').forEach(button => button.addEventListener('click', async () => {
+        const row = button.closest('.management-row');
+        if (!confirm(`${row.dataset.tableName} silinsin?`)) return;
+        try {
+          await tableRequest(`/api/dining-tables/${row.dataset.tableNumber}`, {method:'DELETE'});
+          location.reload();
+        } catch (error) { alert(error.message); }
+      }));
 
       document.querySelectorAll('.product-delete-btn').forEach((button) => {
         button.addEventListener('click', () => {

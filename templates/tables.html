@@ -66,7 +66,8 @@
       function tableCard(table) {
         const total = table.items.reduce((sum, item) => sum + item.line_total, 0);
         return `<button class="table-circle ${table.occupied ? 'occupied' : 'available'}" type="button" onclick="openTableModal(${table.number})">
-          <span class="table-number">Masa ${table.number}</span>
+          <span class="table-number">${escapeHtml(table.name)}</span>
+          <span class="table-category">${escapeHtml(table.category)}</span>
           <span class="table-status">${table.occupied ? 'Dolu' : 'Boş'}</span>
           ${table.occupied ? `<span class="table-total">${total.toFixed(2)} AZN</span>` : ''}
         </button>`;

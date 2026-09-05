@@ -183,7 +183,7 @@ def enforce_access():
         return redirect(url_for('login_page'))
 
     role = session.get('role')
-    protected_pages = {'operations_page', 'reports_page', 'tables_page'}
+    protected_pages = {'operations_page', 'reports_page'}
     protected_actions = {
         'add_movement',
         'api_reports',
@@ -193,6 +193,10 @@ def enforce_access():
         'add_category',
         'rename_category',
         'delete_category',
+        'add_table_category',
+        'manage_table_category',
+        'add_dining_table',
+        'manage_dining_table',
     }
 
     if request.endpoint in protected_pages and role != 'manager':
@@ -399,6 +403,22 @@ def _create_tables_postgres(conn):
             )
             """
         )
+        cur.execute(
+            """
+            CREATE TABLE IF NOT EXISTS dining_tables (
+                table_number INTEGER PRIMARY KEY,
+                name VARCHAR(100) NOT NULL,
+                category VARCHAR(100) NOT NULL DEFAULT 'Standart'
+            )
+            """
+        )
+        cur.execute(
+            """
+            CREATE TABLE IF NOT EXISTS table_categories (
+                name VARCHAR(100) PRIMARY KEY
+            )
+            """
+        )
 
         cur.execute("SELECT name FROM products")
         existing_names = set()
@@ -570,6 +590,22 @@ def _create_tables_sqlite(conn):
             )
             """
         )
+        cur.execute(
+            """
+            CREATE TABLE IF NOT EXISTS dining_tables (
+                table_number INTEGER PRIMARY KEY,
+                name TEXT NOT NULL,
+                category TEXT NOT NULL DEFAULT 'Standart'
+            )
+            """
+        )
+        cur.execute(
+            """
+            CREATE TABLE IF NOT EXISTS table_categories (
+                name TEXT PRIMARY KEY
+            )
+            """
+        )
         cur.execute("SELECT name FROM products")
         existing_names = set()
         for row in cur.fetchall():
@@ -722,6 +758,37 @@ def init_db():
     else:
         _create_tables_sqlite(conn)
     _sync_categories(conn, database_url)
+    _sync_table_definitions(conn, database_url)
+
+
+def _sync_table_definitions(conn, database_url):
+    """Seed the initial six tables and default table category."""
+    cur = conn.cursor()
+    try:
+        if database_url:
+            cur.execute(
+                "INSERT INTO table_categories (name) VALUES (%s) ON CONFLICT (name) DO NOTHING",
+                ("Standart",),
+            )
+            for number in range(1, 7):
+                cur.execute(
+                    """
+                    INSERT INTO dining_tables (table_number, name, category)
+                    VALUES (%s, %s, %s)
+                    ON CONFLICT (table_number) DO NOTHING
+                    """,
+                    (number, f"Masa {number}", "Standart"),
+                )
+        else:
+            cur.execute("INSERT OR IGNORE INTO table_categories (name) VALUES (?)", ("Standart",))
+            for number in range(1, 7):
+                cur.execute(
+                    "INSERT OR IGNORE INTO dining_tables (table_number, name, category) VALUES (?, ?, ?)",
+                    (number, f"Masa {number}", "Standart"),
+                )
+        conn.commit()
+    finally:
+        cur.close()
 
 
 @app.route("/")
@@ -849,11 +916,21 @@ def operations_page():
             cur.close()
 
     categories = _get_categories(conn, database_url)
+    cur = conn.cursor()
+    try:
+        cur.execute("SELECT table_number, name, category FROM dining_tables ORDER BY table_number")
+        dining_tables = cur.fetchall()
+        cur.execute("SELECT name FROM table_categories ORDER BY name")
+        table_categories = [_row_value(row, "name") for row in cur.fetchall()]
+    finally:
+        cur.close()
     return render_template(
         'operations.html',
         products=products,
         history=history,
         categories=categories,
+        dining_tables=dining_tables,
+        table_categories=table_categories,
         default_start=start.isoformat(),
         default_end=end.isoformat(),
     )
@@ -1621,7 +1698,10 @@ def tables_api():
     tables = []
     cur = conn.cursor()
     try:
-        for table_number in range(1, 7):
+        cur.execute("SELECT table_number, name, category FROM dining_tables ORDER BY table_number")
+        definitions = cur.fetchall()
+        for definition in definitions:
+            table_number = _row_value(definition, "table_number")
             cur.execute(
                 f"""
                 SELECT id, opened_at
@@ -1637,6 +1717,8 @@ def tables_api():
             tables.append(
                 {
                     "number": table_number,
+                    "name": _row_value(definition, "name"),
+                    "category": _row_value(definition, "category"),
                     "occupied": order is not None,
                     "order_id": order["id"] if order else None,
                     "opened_at": str(order["opened_at"]) if order else None,
@@ -1688,8 +1770,6 @@ def table_products_api():
 @app.route("/api/tables/<int:table_number>/items", methods=["POST"])
 def add_table_items(table_number):
     """Send products to a table and reserve their stock."""
-    if table_number < 1 or table_number > 6:
-        return jsonify({"success": False, "message": "Masa nömrəsi yanlışdır."}), 400
     data = request.get_json(silent=True) or {}
     cart = data.get("cart", [])
     if not isinstance(cart, list) or not cart:
@@ -1701,6 +1781,12 @@ def add_table_items(table_number):
     placeholder = "%s" if database_url else "?"
     cur = conn.cursor()
     try:
+        cur.execute(
+            f"SELECT table_number FROM dining_tables WHERE table_number = {placeholder}",
+            (table_number,),
+        )
+        if cur.fetchone() is None:
+            return jsonify({"success": False, "message": "Masa tapılmadı."}), 404
         cur.execute(
             f"""
             SELECT id FROM table_orders
@@ -1822,6 +1908,143 @@ def close_table(table_number):
     except (sqlite3.Error, psycopg2.Error) as exc:
         conn.rollback()
         return jsonify({"success": False, "message": f"Hesab bağlanarkən xəta: {exc}"}), 500
+    finally:
+        cur.close()
+
+
+@app.route("/api/table-categories", methods=["POST"])
+def add_table_category():
+    init_db()
+    data = request.get_json(silent=True) or {}
+    name = str(data.get("name", "")).strip()
+    if not name:
+        return jsonify({"success": False, "message": "Masa kateqoriyası adı vacibdir."}), 400
+    conn = get_db()
+    database_url, _ = get_db_config()
+    cur = conn.cursor()
+    try:
+        if database_url:
+            cur.execute("INSERT INTO table_categories (name) VALUES (%s) ON CONFLICT (name) DO NOTHING", (name,))
+        else:
+            cur.execute("INSERT OR IGNORE INTO table_categories (name) VALUES (?)", (name,))
+        conn.commit()
+        return jsonify({"success": True, "category": name})
+    except (sqlite3.Error, psycopg2.Error) as exc:
+        conn.rollback()
+        return jsonify({"success": False, "message": str(exc)}), 500
+    finally:
+        cur.close()
+
+
+@app.route("/api/table-categories/<category_name>", methods=["PUT", "DELETE"])
+def manage_table_category(category_name):
+    init_db()
+    conn = get_db()
+    database_url, _ = get_db_config()
+    old_name = category_name.strip()
+    data = request.get_json(silent=True) or {}
+    cur = conn.cursor()
+    try:
+        if request.method == "PUT":
+            new_name = str(data.get("new_name", "")).strip()
+            if not new_name:
+                return jsonify({"success": False, "message": "Yeni kateqoriya adı vacibdir."}), 400
+            if database_url:
+                cur.execute("UPDATE table_categories SET name = %s WHERE name = %s", (new_name, old_name))
+                cur.execute("UPDATE dining_tables SET category = %s WHERE category = %s", (new_name, old_name))
+            else:
+                cur.execute("UPDATE table_categories SET name = ? WHERE name = ?", (new_name, old_name))
+                cur.execute("UPDATE dining_tables SET category = ? WHERE category = ?", (new_name, old_name))
+            conn.commit()
+            return jsonify({"success": True, "category": new_name})
+        if database_url:
+            if old_name == "Standart":
+                return jsonify({"success": False, "message": "Standart kateqoriyası silinə bilməz."}), 400
+            cur.execute("SELECT COUNT(*) AS count FROM table_categories")
+            if _row_value(cur.fetchone(), "count") <= 1:
+                return jsonify({"success": False, "message": "Son masa kateqoriyası silinə bilməz."}), 400
+            cur.execute("UPDATE dining_tables SET category = 'Standart' WHERE category = %s", (old_name,))
+            cur.execute("DELETE FROM table_categories WHERE name = %s", (old_name,))
+        else:
+            if old_name == "Standart":
+                return jsonify({"success": False, "message": "Standart kateqoriyası silinə bilməz."}), 400
+            cur.execute("SELECT COUNT(*) AS count FROM table_categories")
+            if _row_value(cur.fetchone(), "count") <= 1:
+                return jsonify({"success": False, "message": "Son masa kateqoriyası silinə bilməz."}), 400
+            cur.execute("UPDATE dining_tables SET category = 'Standart' WHERE category = ?", (old_name,))
+            cur.execute("DELETE FROM table_categories WHERE name = ?", (old_name,))
+        conn.commit()
+        return jsonify({"success": True, "category": old_name})
+    except (sqlite3.Error, psycopg2.Error) as exc:
+        conn.rollback()
+        return jsonify({"success": False, "message": str(exc)}), 500
+    finally:
+        cur.close()
+
+
+@app.route("/api/dining-tables", methods=["POST"])
+def add_dining_table():
+    init_db()
+    data = request.get_json(silent=True) or {}
+    name = str(data.get("name", "")).strip()
+    category = str(data.get("category", "Standart") or "Standart").strip()
+    if not name:
+        return jsonify({"success": False, "message": "Masa adı vacibdir."}), 400
+    conn = get_db()
+    database_url, _ = get_db_config()
+    cur = conn.cursor()
+    try:
+        cur.execute("SELECT COALESCE(MAX(table_number), 0) + 1 AS number FROM dining_tables")
+        number = int(_row_value(cur.fetchone(), "number"))
+        if database_url:
+            cur.execute("INSERT INTO dining_tables (table_number, name, category) VALUES (%s, %s, %s)", (number, name, category))
+        else:
+            cur.execute("INSERT INTO dining_tables (table_number, name, category) VALUES (?, ?, ?)", (number, name, category))
+        conn.commit()
+        return jsonify({"success": True, "table_number": number})
+    except (sqlite3.Error, psycopg2.Error) as exc:
+        conn.rollback()
+        return jsonify({"success": False, "message": str(exc)}), 500
+    finally:
+        cur.close()
+
+
+@app.route("/api/dining-tables/<int:table_number>", methods=["PUT", "DELETE"])
+def manage_dining_table(table_number):
+    init_db()
+    conn = get_db()
+    database_url, _ = get_db_config()
+    placeholder = "%s" if database_url else "?"
+    cur = conn.cursor()
+    try:
+        cur.execute(
+            f"SELECT id FROM table_orders WHERE table_number = {placeholder} AND status = 'open' LIMIT 1",
+            (table_number,),
+        )
+        if request.method == "DELETE" and cur.fetchone():
+            return jsonify({"success": False, "message": "Dolu masa silinə bilməz. Əvvəl hesabı bağlayın."}), 400
+        if request.method == "PUT":
+            data = request.get_json(silent=True) or {}
+            name = str(data.get("name", "")).strip()
+            category = str(data.get("category", "Standart") or "Standart").strip()
+            if not name:
+                return jsonify({"success": False, "message": "Masa adı vacibdir."}), 400
+            if database_url:
+                cur.execute("UPDATE dining_tables SET name = %s, category = %s WHERE table_number = %s", (name, category, table_number))
+            else:
+                cur.execute("UPDATE dining_tables SET name = ?, category = ? WHERE table_number = ?", (name, category, table_number))
+            if cur.rowcount == 0:
+                return jsonify({"success": False, "message": "Masa tapılmadı."}), 404
+            conn.commit()
+            return jsonify({"success": True})
+        cur.execute(f"DELETE FROM dining_tables WHERE table_number = {placeholder}", (table_number,))
+        if cur.rowcount == 0:
+            return jsonify({"success": False, "message": "Masa tapılmadı."}), 404
+        conn.commit()
+        return jsonify({"success": True})
+    except (sqlite3.Error, psycopg2.Error) as exc:
+        conn.rollback()
+        return jsonify({"success": False, "message": str(exc)}), 500
     finally:
         cur.close()
 
