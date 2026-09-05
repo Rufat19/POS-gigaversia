@@ -44,6 +44,24 @@
           <h1 class="open-orders-title">Açıq qalanlar</h1>
           <a class="btn primary back-products" href="/">Məhsullara qayıt</a>
         </div>
+        <div class="orders-toolbar" aria-label="Borc filterləri">
+          <input id="orders-search" type="search" placeholder="Müştəri adına görə axtar..." aria-label="Müştəri adına görə axtar">
+          <div class="orders-filter-buttons">
+            <button type="button" class="btn order-filter-btn active" data-status="all">Hamısı</button>
+            <button type="button" class="btn order-filter-btn" data-status="open">Açıq</button>
+            <button type="button" class="btn order-filter-btn" data-status="paid">Ödənilmiş</button>
+          </div>
+          <div class="orders-sort-buttons" aria-label="Sıralama">
+            <button type="button" class="btn order-sort-btn active" data-sort="newest">Yeni</button>
+            <button type="button" class="btn order-sort-btn" data-sort="oldest">Köhnə</button>
+            <button type="button" class="btn order-sort-btn" data-sort="amount">Məbləğ</button>
+            <button type="button" class="btn order-sort-btn" data-sort="name">Ad</button>
+          </div>
+          <label class="orders-group-toggle">
+            <input id="orders-group-by-customer" type="checkbox">
+            <span>Müştəriyə görə qruplaşdır</span>
+          </label>
+        </div>
         <div id="open-orders-list" class="credit-orders-grid"></div>
       </section>
       <section class="paid-orders-section">
@@ -60,6 +78,9 @@
           title: 'Açıq qalanlar', back: 'Məhsullara qayıt', history: 'Borc tarixçəsi',
           paid: 'Ödənilib', paidAmount: 'Ödənilən', total: 'Ümumi', remaining: 'Qalıq',
           addProduct: 'Məhsul əlavə et', partialPayment: 'Hissəli ödəniş',
+          searchCustomer: 'Müştəri adına görə axtar...', all: 'Hamısı', open: 'Açıq',
+          paidFilter: 'Ödənilmiş', newest: 'Yeni', oldest: 'Köhnə', amount: 'Məbləğ',
+          name: 'Ad', groupByCustomer: 'Müştəriyə görə qruplaşdır',
           noOpen: 'Açıq sifariş yoxdur.', noHistory: 'Borc tarixçəsi boşdur.',
           paymentPrompt: 'Ödənilən məbləği yazın (AZN):', invalidPayment: 'Düzgün ödəniş məbləği yazın.',
           paymentFailed: 'Ödəniş qeydə alınmadı.', loadFailed: 'Sifarişlər yüklənmədi.'
@@ -70,6 +91,9 @@
           title: 'Open orders', back: 'Back to products', history: 'Credit history',
           paid: 'Paid', paidAmount: 'Paid', total: 'Total', remaining: 'Remaining',
           addProduct: 'Add products', partialPayment: 'Partial payment',
+          searchCustomer: 'Search by customer name...', all: 'All', open: 'Open',
+          paidFilter: 'Paid', newest: 'Newest', oldest: 'Oldest', amount: 'Amount',
+          name: 'Name', groupByCustomer: 'Group by customer',
           noOpen: 'No open orders.', noHistory: 'Credit history is empty.',
           paymentPrompt: 'Enter payment amount (AZN):', invalidPayment: 'Enter a valid payment amount.',
           paymentFailed: 'Payment was not recorded.', loadFailed: 'Orders could not be loaded.'
@@ -80,6 +104,9 @@
           title: 'Открытые заказы', back: 'К товарам', history: 'История долгов',
           paid: 'Оплачено', paidAmount: 'Оплачено', total: 'Всего', remaining: 'Остаток',
           addProduct: 'Добавить товары', partialPayment: 'Частичная оплата',
+          searchCustomer: 'Поиск по имени клиента...', all: 'Все', open: 'Открытые',
+          paidFilter: 'Оплаченные', newest: 'Новые', oldest: 'Старые', amount: 'Сумма',
+          name: 'Имя', groupByCustomer: 'Группировать по клиенту',
           noOpen: 'Нет открытых заказов.', noHistory: 'История долгов пуста.',
           paymentPrompt: 'Введите сумму оплаты (AZN):', invalidPayment: 'Введите корректную сумму.',
           paymentFailed: 'Платеж не записан.', loadFailed: 'Не удалось загрузить заказы.'
@@ -90,6 +117,9 @@
           title: 'Açık siparişler', back: 'Ürünlere dön', history: 'Borç geçmişi',
           paid: 'Ödendi', paidAmount: 'Ödenen', total: 'Toplam', remaining: 'Kalan',
           addProduct: 'Ürün ekle', partialPayment: 'Kısmi ödeme',
+          searchCustomer: 'Müşteri adına göre ara...', all: 'Tümü', open: 'Açık',
+          paidFilter: 'Ödenmiş', newest: 'Yeni', oldest: 'Eski', amount: 'Tutar',
+          name: 'Ad', groupByCustomer: 'Müşteriye göre grupla',
           noOpen: 'Açık sipariş yok.', noHistory: 'Borç geçmişi boş.',
           paymentPrompt: 'Ödeme tutarını yazın (AZN):', invalidPayment: 'Geçerli bir ödeme tutarı yazın.',
           paymentFailed: 'Ödeme kaydedilmedi.', loadFailed: 'Siparişler yüklenemedi.'
@@ -111,10 +141,22 @@
         document.querySelector('.open-orders-title').textContent = dict.title;
         document.querySelector('.back-products').textContent = dict.back;
         document.querySelector('.paid-history-title').textContent = dict.history;
+        document.getElementById('orders-search').placeholder = dict.searchCustomer;
+        document.querySelector('[data-status="all"]').textContent = dict.all;
+        document.querySelector('[data-status="open"]').textContent = dict.open;
+        document.querySelector('[data-status="paid"]').textContent = dict.paidFilter;
+        document.querySelector('[data-sort="newest"]').textContent = dict.newest;
+        document.querySelector('[data-sort="oldest"]').textContent = dict.oldest;
+        document.querySelector('[data-sort="amount"]').textContent = dict.amount;
+        document.querySelector('[data-sort="name"]').textContent = dict.name;
+        document.querySelector('.orders-group-toggle span').textContent = dict.groupByCustomer;
         document.getElementById('open-orders-lang-select').value = currentLang;
         document.documentElement.lang = currentLang;
         localStorage.setItem('pos_lang', currentLang);
       }
+      let allOrders = [];
+      let selectedStatus = 'all';
+      let selectedSort = 'newest';
       function orderCard(order, isPaid){
         const items=order.items.map(item=>`<li>${item.name} × ${item.quantity}<strong>${item.line_total.toFixed(2)} AZN</strong></li>`).join('');
         const action=isPaid
@@ -126,14 +168,40 @@
         return `<article class="credit-order-card"><div class="credit-order-top"><div><h3>${escapeHtml(order.customer_name)}</h3><small>${order.created_at}</small></div><strong class="credit-total">${order.remaining_amount.toFixed(2)} AZN</strong></div>${paymentInfo}<ul>${items}</ul>${action}</article>`;
       }
       function escapeHtml(value){ return String(value).replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[ch])); }
+      function renderOrderLists(){
+        const query = document.getElementById('orders-search').value.trim().toLocaleLowerCase();
+        let filtered = allOrders.filter(order => {
+          const statusMatches = selectedStatus === 'all' || order.status === selectedStatus;
+          return statusMatches && order.customer_name.toLocaleLowerCase().includes(query);
+        });
+        filtered.sort((a, b) => {
+          if (selectedSort === 'oldest') return a.created_at.localeCompare(b.created_at);
+          if (selectedSort === 'amount') return b.remaining_amount - a.remaining_amount;
+          if (selectedSort === 'name') return a.customer_name.localeCompare(b.customer_name);
+          return b.created_at.localeCompare(a.created_at);
+        });
+        const grouped = document.getElementById('orders-group-by-customer').checked;
+        const renderList = (status, emptyText) => {
+          const orders = filtered.filter(order => order.status === status);
+          if (!orders.length) return `<p class="empty-state">${emptyText}</p>`;
+          if (!grouped) return orders.map(order => orderCard(order, status === 'paid')).join('');
+          const groups = orders.reduce((result, order) => {
+            (result[order.customer_name] ||= []).push(order);
+            return result;
+          }, {});
+          return Object.entries(groups).map(([customer, customerOrders]) =>
+            `<div class="customer-order-group"><h3>${escapeHtml(customer)}</h3>${customerOrders.map(order => orderCard(order, status === 'paid')).join('')}</div>`
+          ).join('');
+        };
+        document.getElementById('open-orders-list').innerHTML = renderList('open', t('noOpen'));
+        document.getElementById('paid-orders-list').innerHTML = renderList('paid', t('noHistory'));
+      }
       async function loadOrders(){
         const response=await fetch('/api/credit-orders');
         const result=await response.json();
         if(!response.ok) throw new Error(result.message || t('loadFailed'));
-        const open=result.orders.filter(order=>order.status==='open');
-        const paid=result.orders.filter(order=>order.status==='paid');
-        document.getElementById('open-orders-list').innerHTML=open.length ? open.map(order=>orderCard(order,false)).join('') : `<p class="empty-state">${t('noOpen')}</p>`;
-        document.getElementById('paid-orders-list').innerHTML=paid.length ? paid.map(order=>orderCard(order,true)).join('') : `<p class="empty-state">${t('noHistory')}</p>`;
+        allOrders = result.orders;
+        renderOrderLists();
       }
       async function payOrder(orderId){
         const amount=window.prompt(t('paymentPrompt'));
@@ -153,6 +221,18 @@
         applyLanguage(event.target.value);
         loadOrders().catch(error=>alert(error.message));
       });
+      document.getElementById('orders-search').addEventListener('input', renderOrderLists);
+      document.querySelectorAll('.order-filter-btn').forEach(button => button.addEventListener('click', () => {
+        selectedStatus = button.dataset.status;
+        document.querySelectorAll('.order-filter-btn').forEach(item => item.classList.toggle('active', item === button));
+        renderOrderLists();
+      }));
+      document.querySelectorAll('.order-sort-btn').forEach(button => button.addEventListener('click', () => {
+        selectedSort = button.dataset.sort;
+        document.querySelectorAll('.order-sort-btn').forEach(item => item.classList.toggle('active', item === button));
+        renderOrderLists();
+      }));
+      document.getElementById('orders-group-by-customer').addEventListener('change', renderOrderLists);
       applyLanguage(currentLang);
       loadOrders().catch(error=>{
         document.getElementById('open-orders-list').innerHTML=`<p class="error-state">${escapeHtml(error.message)}</p>`;
