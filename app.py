@@ -183,7 +183,7 @@ def enforce_access():
         return redirect(url_for('login_page'))
 
     role = session.get('role')
-    protected_pages = {'operations_page', 'reports_page'}
+    protected_pages = {'operations_page', 'reports_page', 'tables_page'}
     protected_actions = {
         'add_movement',
         'api_reports',
@@ -377,6 +377,28 @@ def _create_tables_postgres(conn):
             )
             """
         )
+        cur.execute(
+            """
+            CREATE TABLE IF NOT EXISTS table_orders (
+                id SERIAL PRIMARY KEY,
+                table_number INTEGER NOT NULL,
+                status VARCHAR(20) NOT NULL DEFAULT 'open',
+                opened_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                closed_at TIMESTAMP
+            )
+            """
+        )
+        cur.execute(
+            """
+            CREATE TABLE IF NOT EXISTS table_order_items (
+                id SERIAL PRIMARY KEY,
+                table_order_id INTEGER NOT NULL REFERENCES table_orders(id) ON DELETE CASCADE,
+                product_id INTEGER NOT NULL REFERENCES products(id) ON DELETE RESTRICT,
+                quantity INTEGER NOT NULL,
+                unit_price NUMERIC(10,2) NOT NULL
+            )
+            """
+        )
 
         cur.execute("SELECT name FROM products")
         existing_names = set()
@@ -520,6 +542,30 @@ def _create_tables_sqlite(conn):
                 unit_price REAL NOT NULL,
                 created_at TEXT DEFAULT CURRENT_TIMESTAMP,
                 FOREIGN KEY (credit_order_id) REFERENCES credit_orders(id) ON DELETE CASCADE,
+                FOREIGN KEY (product_id) REFERENCES products(id)
+            )
+            """
+        )
+        cur.execute(
+            """
+            CREATE TABLE IF NOT EXISTS table_orders (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                table_number INTEGER NOT NULL,
+                status TEXT NOT NULL DEFAULT 'open',
+                opened_at TEXT DEFAULT CURRENT_TIMESTAMP,
+                closed_at TEXT
+            )
+            """
+        )
+        cur.execute(
+            """
+            CREATE TABLE IF NOT EXISTS table_order_items (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                table_order_id INTEGER NOT NULL,
+                product_id INTEGER NOT NULL,
+                quantity INTEGER NOT NULL,
+                unit_price REAL NOT NULL,
+                FOREIGN KEY (table_order_id) REFERENCES table_orders(id) ON DELETE CASCADE,
                 FOREIGN KEY (product_id) REFERENCES products(id)
             )
             """
@@ -1536,6 +1582,248 @@ def open_orders_page():
     """Render open credit orders and the paid credit-order history."""
     init_db()
     return render_template("open_orders.html")
+
+
+@app.route("/tables")
+def tables_page():
+    """Render the six-table floor view."""
+    init_db()
+    return render_template("tables.html")
+
+
+def _table_order_items(conn, database_url, order_id):
+    placeholder = "%s" if database_url else "?"
+    cur = conn.cursor()
+    try:
+        cur.execute(
+            f"""
+            SELECT toi.product_id, p.name, toi.quantity, toi.unit_price,
+                   (toi.quantity * toi.unit_price) AS line_total
+            FROM table_order_items toi
+            JOIN products p ON p.id = toi.product_id
+            WHERE toi.table_order_id = {placeholder}
+            ORDER BY toi.id
+            """,
+            (order_id,),
+        )
+        return cur.fetchall()
+    finally:
+        cur.close()
+
+
+@app.route("/api/tables", methods=["GET"])
+def tables_api():
+    """Return the six tables and their current open bills."""
+    init_db()
+    conn = get_db()
+    database_url, _ = get_db_config()
+    placeholder = "%s" if database_url else "?"
+    tables = []
+    cur = conn.cursor()
+    try:
+        for table_number in range(1, 7):
+            cur.execute(
+                f"""
+                SELECT id, opened_at
+                FROM table_orders
+                WHERE table_number = {placeholder} AND status = 'open'
+                ORDER BY id DESC
+                LIMIT 1
+                """,
+                (table_number,),
+            )
+            order = cur.fetchone()
+            items = _table_order_items(conn, database_url, order["id"]) if order else []
+            tables.append(
+                {
+                    "number": table_number,
+                    "occupied": order is not None,
+                    "order_id": order["id"] if order else None,
+                    "opened_at": str(order["opened_at"]) if order else None,
+                    "items": [
+                        {
+                            "product_id": _row_value(item, "product_id"),
+                            "name": _row_value(item, "name"),
+                            "quantity": _row_value(item, "quantity"),
+                            "unit_price": float(_row_value(item, "unit_price")),
+                            "line_total": float(_row_value(item, "line_total")),
+                        }
+                        for item in items
+                    ],
+                }
+            )
+    finally:
+        cur.close()
+    return jsonify({"success": True, "tables": tables})
+
+
+@app.route("/api/tables/products", methods=["GET"])
+def table_products_api():
+    """Return products for the table-order picker."""
+    init_db()
+    conn = get_db()
+    cur = conn.cursor()
+    try:
+        cur.execute("SELECT id, name, category, price, stock FROM products ORDER BY name")
+        products = cur.fetchall()
+        return jsonify(
+            {
+                "success": True,
+                "products": [
+                    {
+                        "id": _row_value(product, "id"),
+                        "name": _row_value(product, "name"),
+                        "category": _row_value(product, "category"),
+                        "price": float(_row_value(product, "price")),
+                        "stock": _row_value(product, "stock"),
+                    }
+                    for product in products
+                ],
+            }
+        )
+    finally:
+        cur.close()
+
+
+@app.route("/api/tables/<int:table_number>/items", methods=["POST"])
+def add_table_items(table_number):
+    """Send products to a table and reserve their stock."""
+    if table_number < 1 or table_number > 6:
+        return jsonify({"success": False, "message": "Masa nömrəsi yanlışdır."}), 400
+    data = request.get_json(silent=True) or {}
+    cart = data.get("cart", [])
+    if not isinstance(cart, list) or not cart:
+        return jsonify({"success": False, "message": "Məhsul seçilməyib."}), 400
+
+    init_db()
+    conn = get_db()
+    database_url, _ = get_db_config()
+    placeholder = "%s" if database_url else "?"
+    cur = conn.cursor()
+    try:
+        cur.execute(
+            f"""
+            SELECT id FROM table_orders
+            WHERE table_number = {placeholder} AND status = 'open'
+            ORDER BY id DESC LIMIT 1
+            """,
+            (table_number,),
+        )
+        order = cur.fetchone()
+        if order:
+            order_id = _row_value(order, "id")
+        elif database_url:
+            cur.execute(
+                "INSERT INTO table_orders (table_number) VALUES (%s) RETURNING id",
+                (table_number,),
+            )
+            order_id = cur.fetchone()["id"]
+        else:
+            cur.execute("INSERT INTO table_orders (table_number) VALUES (?)", (table_number,))
+            order_id = cur.lastrowid
+
+        for item in cart:
+            product_id = item.get("id")
+            quantity = item.get("quantity")
+            if not isinstance(product_id, int) or not isinstance(quantity, int) or quantity < 1:
+                raise ValueError("Yanlış məhsul məlumatı.")
+            cur.execute(
+                f"SELECT id, price, stock FROM products WHERE id = {placeholder}",
+                (product_id,),
+            )
+            product = cur.fetchone()
+            if product is None:
+                raise ValueError("Məhsul tapılmadı.")
+            if quantity > _row_value(product, "stock"):
+                raise ValueError("Stokda kifayət qədər məhsul yoxdur.")
+            cur.execute(
+                f"""
+                SELECT id, quantity FROM table_order_items
+                WHERE table_order_id = {placeholder} AND product_id = {placeholder}
+                """,
+                (order_id, product_id),
+            )
+            existing = cur.fetchone()
+            if existing:
+                cur.execute(
+                    f"UPDATE table_order_items SET quantity = quantity + {placeholder} WHERE id = {placeholder}",
+                    (quantity, _row_value(existing, "id")),
+                )
+            elif database_url:
+                cur.execute(
+                    "INSERT INTO table_order_items (table_order_id, product_id, quantity, unit_price) VALUES (%s, %s, %s, %s)",
+                    (order_id, product_id, quantity, _row_value(product, "price")),
+                )
+            else:
+                cur.execute(
+                    "INSERT INTO table_order_items (table_order_id, product_id, quantity, unit_price) VALUES (?, ?, ?, ?)",
+                    (order_id, product_id, quantity, _row_value(product, "price")),
+                )
+            cur.execute(
+                f"UPDATE products SET stock = stock - {placeholder} WHERE id = {placeholder}",
+                (quantity, product_id),
+            )
+        conn.commit()
+        return jsonify({"success": True, "message": "Məhsullar masaya göndərildi."})
+    except ValueError as exc:
+        conn.rollback()
+        return jsonify({"success": False, "message": str(exc)}), 400
+    except (sqlite3.Error, psycopg2.Error) as exc:
+        conn.rollback()
+        return jsonify({"success": False, "message": f"Masa sifarişi yazılarkən xəta: {exc}"}), 500
+    finally:
+        cur.close()
+
+
+@app.route("/api/tables/<int:table_number>/close", methods=["POST"])
+def close_table(table_number):
+    """Close a table bill and record it as a completed sale."""
+    init_db()
+    conn = get_db()
+    database_url, _ = get_db_config()
+    placeholder = "%s" if database_url else "?"
+    cur = conn.cursor()
+    try:
+        cur.execute(
+            f"SELECT id FROM table_orders WHERE table_number = {placeholder} AND status = 'open' ORDER BY id DESC LIMIT 1",
+            (table_number,),
+        )
+        order = cur.fetchone()
+        if not order:
+            return jsonify({"success": False, "message": "Bu masa boşdur."}), 400
+        order_id = _row_value(order, "id")
+        items = _table_order_items(conn, database_url, order_id)
+        if not items:
+            return jsonify({"success": False, "message": "Masada məhsul yoxdur."}), 400
+        total = sum(float(_row_value(item, "line_total")) for item in items)
+        if database_url:
+            cur.execute("INSERT INTO sales (total_amount) VALUES (%s) RETURNING id", (total,))
+            sale_id = cur.fetchone()["id"]
+        else:
+            cur.execute("INSERT INTO sales (total_amount) VALUES (?)", (total,))
+            sale_id = cur.lastrowid
+        for item in items:
+            if database_url:
+                cur.execute(
+                    "INSERT INTO sale_items (sale_id, product_id, quantity, unit_price) VALUES (%s, %s, %s, %s)",
+                    (sale_id, _row_value(item, "product_id"), _row_value(item, "quantity"), _row_value(item, "unit_price")),
+                )
+            else:
+                cur.execute(
+                    "INSERT INTO sale_items (sale_id, product_id, quantity, unit_price) VALUES (?, ?, ?, ?)",
+                    (sale_id, _row_value(item, "product_id"), _row_value(item, "quantity"), _row_value(item, "unit_price")),
+                )
+        cur.execute(
+            f"UPDATE table_orders SET status = 'closed', closed_at = CURRENT_TIMESTAMP WHERE id = {placeholder}",
+            (order_id,),
+        )
+        conn.commit()
+        return jsonify({"success": True, "sale_id": sale_id, "total": round(total, 2), "message": "Masa hesabı bağlandı."})
+    except (sqlite3.Error, psycopg2.Error) as exc:
+        conn.rollback()
+        return jsonify({"success": False, "message": f"Hesab bağlanarkən xəta: {exc}"}), 500
+    finally:
+        cur.close()
 
 
 @app.route("/api/credit-orders", methods=["GET", "POST"])

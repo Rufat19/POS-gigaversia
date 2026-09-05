@@ -1,0 +1,163 @@
+<!doctype html>
+<html lang="az">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Masalar - RB19 POS</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}?v=20260905-tables">
+  </head>
+  <body>
+    <div class="page-header">
+      <div class="page-title brand-header">
+        <div class="brand-mark">RB19</div>
+        <p class="page-subtitle">Masa sifarişləri</p>
+      </div>
+      <div class="page-actions">
+        <nav class="page-nav">
+          <a href="/">Məhsullar</a>
+          <a href="/tables" class="active">Masalar</a>
+          <a href="/open-orders">Açıq qalanlar</a>
+          {% if session.get('role') == 'manager' %}
+            <a href="/operations">Əməliyyatlar</a>
+            <a href="/reports">Hesabatlar</a>
+          {% endif %}
+        </nav>
+        <div class="user-chip">{{ 'Müdir' if session.get('role') == 'manager' else 'Satıcı' }} · <a href="/logout">Çıxış</a></div>
+      </div>
+    </div>
+    <main class="container tables-page">
+      <div class="tables-heading">
+        <div>
+          <h1>Masalar</h1>
+          <p>Yaşıl masa boşdur, qırmızı masa doludur.</p>
+        </div>
+        <button class="btn primary" type="button" onclick="loadTables()">Yenilə</button>
+      </div>
+      <section id="tables-grid" class="tables-grid"></section>
+    </main>
+
+    <div id="table-modal" class="table-modal" hidden>
+      <div class="table-modal-card">
+        <div class="table-modal-header">
+          <h2 id="modal-title">Masa</h2>
+          <button class="modal-close" type="button" onclick="closeTableModal()">×</button>
+        </div>
+        <div id="table-order-summary" class="table-order-summary"></div>
+        <div class="table-product-picker">
+          <input id="table-product-search" type="search" placeholder="Məhsul axtar...">
+          <div id="table-products" class="table-products"></div>
+        </div>
+        <div class="table-modal-actions">
+          <button id="send-to-table" class="btn primary" type="button">Masaya göndər</button>
+          <button id="close-table-bill" class="btn danger" type="button">Hesabı bağla</button>
+        </div>
+        <div id="table-message" class="table-message"></div>
+      </div>
+    </div>
+    <script>
+      let tables = [];
+      let products = [];
+      let selectedTable = null;
+      let pendingCart = [];
+
+      function escapeHtml(value) {
+        return String(value).replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[ch]));
+      }
+      function tableCard(table) {
+        const total = table.items.reduce((sum, item) => sum + item.line_total, 0);
+        return `<button class="table-circle ${table.occupied ? 'occupied' : 'available'}" type="button" onclick="openTableModal(${table.number})">
+          <span class="table-number">Masa ${table.number}</span>
+          <span class="table-status">${table.occupied ? 'Dolu' : 'Boş'}</span>
+          ${table.occupied ? `<span class="table-total">${total.toFixed(2)} AZN</span>` : ''}
+        </button>`;
+      }
+      function renderTables() {
+        document.getElementById('tables-grid').innerHTML = tables.map(tableCard).join('');
+      }
+      function renderProducts() {
+        const query = document.getElementById('table-product-search').value.trim().toLocaleLowerCase();
+        document.getElementById('table-products').innerHTML = products
+          .filter(product => product.name.toLocaleLowerCase().includes(query))
+          .map(product => `<button class="table-product-btn" type="button" ${product.stock < 1 ? 'disabled' : ''} onclick="addPendingProduct(${product.id})">
+            <strong>${escapeHtml(product.name)}</strong><span>${product.price.toFixed(2)} AZN · Stok: ${product.stock}</span>
+          </button>`).join('');
+      }
+      function renderSummary() {
+        const current = selectedTable ? selectedTable.items : [];
+        const combined = [...current];
+        pendingCart.forEach(item => {
+          const existing = combined.find(row => row.product_id === item.id);
+          if (existing) existing.quantity += item.quantity;
+          else combined.push({name: item.name, quantity: item.quantity, line_total: item.price * item.quantity});
+        });
+        document.getElementById('table-order-summary').innerHTML = combined.length
+          ? combined.map(item => `<div><span>${escapeHtml(item.name)} × ${item.quantity}</span><strong>${item.line_total.toFixed(2)} AZN</strong></div>`).join('')
+          : '<p>Bu masa hələ boşdur.</p>';
+      }
+      function addPendingProduct(id) {
+        const product = products.find(item => item.id === id);
+        if (!product) return;
+        const existing = pendingCart.find(item => item.id === id);
+        if (existing) existing.quantity += 1;
+        else pendingCart.push({id: product.id, name: product.name, price: product.price, quantity: 1});
+        renderSummary();
+      }
+      function openTableModal(number) {
+        selectedTable = tables.find(table => table.number === number);
+        pendingCart = [];
+        document.getElementById('modal-title').textContent = `Masa ${number}`;
+        document.getElementById('table-modal').hidden = false;
+        document.getElementById('table-message').textContent = '';
+        renderProducts();
+        renderSummary();
+      }
+      function closeTableModal() {
+        document.getElementById('table-modal').hidden = true;
+        selectedTable = null;
+      }
+      async function loadTables() {
+        const response = await fetch('/api/tables');
+        const result = await response.json();
+        if (!response.ok) throw new Error(result.message || 'Masalar yüklənmədi.');
+        tables = result.tables;
+        renderTables();
+        if (selectedTable) {
+          selectedTable = tables.find(table => table.number === selectedTable.number);
+          renderSummary();
+        }
+      }
+      async function loadProducts() {
+        const response = await fetch('/api/tables/products');
+        const result = await response.json();
+        if (!response.ok) throw new Error(result.message || 'Məhsullar yüklənmədi.');
+        products = result.products;
+      }
+      document.getElementById('table-product-search').addEventListener('input', renderProducts);
+      document.getElementById('send-to-table').addEventListener('click', async () => {
+        if (!pendingCart.length || !selectedTable) return;
+        const response = await fetch(`/api/tables/${selectedTable.number}/items`, {
+          method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({cart: pendingCart})
+        });
+        const result = await response.json();
+        document.getElementById('table-message').textContent = result.message;
+        if (!response.ok) return;
+        pendingCart = [];
+        await loadTables();
+        document.getElementById('table-message').textContent = 'Məhsullar masaya göndərildi.';
+      });
+      document.getElementById('close-table-bill').addEventListener('click', async () => {
+        if (!selectedTable || !selectedTable.occupied) return;
+        if (!confirm('Bu masanın hesabı bağlansın?')) return;
+        const response = await fetch(`/api/tables/${selectedTable.number}/close`, {method: 'POST'});
+        const result = await response.json();
+        document.getElementById('table-message').textContent = result.message;
+        if (!response.ok) return;
+        await loadTables();
+        closeTableModal();
+      });
+      Promise.all([loadProducts(), loadTables()]).catch(error => {
+        document.getElementById('tables-grid').innerHTML = `<p class="error-state">${escapeHtml(error.message)}</p>`;
+      });
+    </script>
+  </body>
+</html>
