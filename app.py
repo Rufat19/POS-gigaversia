@@ -53,6 +53,16 @@ app.config["SESSION_COOKIE_HTTPONLY"] = True
 app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
 app.config["SESSION_COOKIE_SECURE"] = is_production
 
+
+@app.errorhandler(403)
+def forbidden_page(error):
+    """Show a useful access message instead of the server's generic 403 page."""
+    return render_template(
+        "forbidden.html",
+        role=session.get("role"),
+        is_admin=session.get("role") == "admin",
+    ), 403
+
 PIN_USERS = {
     seller_pin or "1111": "seller",
     manager_pin or "1991": "manager",

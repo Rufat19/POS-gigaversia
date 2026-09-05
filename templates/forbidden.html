@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="az">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Giriş məhduddur</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}?v=20260905-forbidden">
+  </head>
+  <body>
+    <main class="container">
+      <section class="card operations-card">
+        <h1>Bu bölməyə giriş bağlıdır</h1>
+        {% if is_admin %}
+          <p>Admin kimi girişiniz aktivdir. Bölmənin səlahiyyətini admin panelindən yenidən aça bilərsiniz.</p>
+          <a class="btn primary" href="/admin">Admin panelinə qayıt</a>
+        {% elif role %}
+          <p>Bu bölmə sizin istifadəçi üçün admin tərəfindən bloklanıb.</p>
+          <a class="btn primary" href="/">Məhsullara qayıt</a>
+        {% else %}
+          <p>Sessiya bitib. Yenidən daxil olun.</p>
+          <a class="btn primary" href="/login">Giriş səhifəsinə qayıt</a>
+        {% endif %}
+      </section>
+    </main>
+  </body>
+</html>
