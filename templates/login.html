@@ -34,9 +34,9 @@
             type="password"
             name="pin"
             inputmode="numeric"
-            maxlength="4"
+            maxlength="6"
             pattern="[0-9]*"
-            placeholder="••••"
+            placeholder="••••••"
             aria-label="PIN"
             autocomplete="one-time-code"
             data-i18n-placeholder="login.pinPlaceholder"
@@ -71,34 +71,34 @@
         az: {
           'common.pos': 'POS',
           'login.title': 'İstifadəçi kodunu daxil edin',
-          'login.pinPlaceholder': '••••',
+          'login.pinPlaceholder': '••••••',
           'login.clear': 'Sil',
           'login.submit': 'Giriş',
-          'login.hint': 'Satıcı və müdir üçün giriş'
+          'login.hint': 'Satıcı, müdir və admin üçün giriş'
         },
         en: {
           'common.pos': 'POS',
           'login.title': 'Enter user code',
-          'login.pinPlaceholder': '••••',
+          'login.pinPlaceholder': '••••••',
           'login.clear': 'Clear',
           'login.submit': 'Login',
-          'login.hint': 'Seller and manager sign-in'
+          'login.hint': 'Seller, manager and admin sign-in'
         },
         ru: {
           'common.pos': 'POS',
           'login.title': 'Введите код пользователя',
-          'login.pinPlaceholder': '••••',
+          'login.pinPlaceholder': '••••••',
           'login.clear': 'Сброс',
           'login.submit': 'Войти',
-          'login.hint': 'Вход для продавца и менеджера'
+          'login.hint': 'Вход для продавца, менеджера и администратора'
         },
         tr: {
           'common.pos': 'POS',
           'login.title': 'Kullanıcı kodunu girin',
-          'login.pinPlaceholder': '••••',
+          'login.pinPlaceholder': '••••••',
           'login.clear': 'Temizle',
           'login.submit': 'Giriş',
-          'login.hint': 'Satıcı ve yöneticiler için giriş'
+          'login.hint': 'Satıcı, yönetici ve admin girişi'
         }
       };
 
@@ -143,7 +143,7 @@
           }
 
           if (!value) return;
-          if (pinInput.value.length >= 4) return;
+          if (pinInput.value.length >= 6) return;
           pinInput.value += value;
           pinInput.focus();
         });

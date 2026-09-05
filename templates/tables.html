@@ -13,25 +13,33 @@
         <p class="page-subtitle">Masa sifarişləri</p>
       </div>
       <div class="page-actions">
+        <select id="tables-lang-select" class="lang-select" aria-label="Dil seçimi">
+          <option value="az">Aze</option><option value="en">Eng</option>
+          <option value="ru">Rus</option><option value="tr">Tur</option>
+        </select>
         <nav class="page-nav">
-          <a href="/">Məhsullar</a>
-          <a href="/tables" class="active">Masalar</a>
-          <a href="/open-orders">Açıq qalanlar</a>
-          {% if session.get('role') == 'manager' %}
+          {% if feature_enabled('products') %}<a href="/">Məhsullar</a>{% endif %}
+          <a href="/tables" class="active" data-i18n="tables">Masalar</a>
+          {% if feature_enabled('open_orders') %}<a href="/open-orders">Açıq qalanlar</a>{% endif %}
+          {% if session.get('role') in ('manager', 'admin') %}
+            {% if feature_enabled('operations') %}
             <a href="/operations">Əməliyyatlar</a>
+            {% endif %}
+            {% if feature_enabled('reports') %}
             <a href="/reports">Hesabatlar</a>
+            {% endif %}
           {% endif %}
         </nav>
-        <div class="user-chip">{{ 'Müdir' if session.get('role') == 'manager' else 'Satıcı' }} · <a href="/logout">Çıxış</a></div>
+        <div class="user-chip">{{ 'Admin' if session.get('role') == 'admin' else ('Müdir' if session.get('role') == 'manager' else 'Satıcı') }} · <a href="/logout">Çıxış</a></div>
       </div>
     </div>
     <main class="container tables-page">
       <div class="tables-heading">
         <div>
-          <h1>Masalar</h1>
-          <p>Yaşıl masa boşdur, qırmızı masa doludur.</p>
+          <h1 data-i18n="tables">Masalar</h1>
+          <p data-i18n="legend">Yaşıl masa boşdur, qırmızı masa doludur.</p>
         </div>
-        <button class="btn primary" type="button" onclick="loadTables()">Yenilə</button>
+        <button class="btn primary" type="button" onclick="loadTables()" data-i18n="refresh">Yenilə</button>
       </div>
       <section id="tables-grid" class="tables-grid"></section>
     </main>
@@ -39,17 +47,17 @@
     <div id="table-modal" class="table-modal" hidden>
       <div class="table-modal-card">
         <div class="table-modal-header">
-          <h2 id="modal-title">Masa</h2>
+          <h2 id="modal-title" data-i18n="table">Masa</h2>
           <button class="modal-close" type="button" onclick="closeTableModal()">×</button>
         </div>
         <div id="table-order-summary" class="table-order-summary"></div>
         <div class="table-product-picker">
-          <input id="table-product-search" type="search" placeholder="Məhsul axtar...">
+          <input id="table-product-search" type="search" placeholder="Məhsul axtar..." data-i18n-placeholder="search">
           <div id="table-products" class="table-products"></div>
         </div>
         <div class="table-modal-actions">
-          <button id="send-to-table" class="btn primary" type="button">Masaya göndər</button>
-          <button id="close-table-bill" class="btn danger" type="button">Hesabı bağla</button>
+          <button id="send-to-table" class="btn primary" type="button" data-i18n="send">Masaya göndər</button>
+          <button id="close-table-bill" class="btn danger" type="button" data-i18n="close">Hesabı bağla</button>
         </div>
         <div id="table-message" class="table-message"></div>
       </div>
@@ -59,6 +67,24 @@
       let products = [];
       let selectedTable = null;
       let pendingCart = [];
+      const translations = {
+        az: {tables:'Masalar', legend:'Yaşıl masa boşdur, qırmızı masa doludur.', refresh:'Yenilə', table:'Masa', search:'Məhsul axtar...', send:'Masaya göndər', close:'Hesabı bağla', available:'Boş', occupied:'Dolu', empty:'Bu masa hələ boşdur.', sent:'Məhsullar masaya göndərildi.', confirm:'Bu masanın hesabı bağlansın?'},
+        en: {tables:'Tables', legend:'Green is available, red is occupied.', refresh:'Refresh', table:'Table', search:'Search product...', send:'Send to table', close:'Close bill', available:'Available', occupied:'Occupied', empty:'This table is empty.', sent:'Products sent to table.', confirm:'Close this table bill?'},
+        ru: {tables:'Столы', legend:'Зелёный стол свободен, красный занят.', refresh:'Обновить', table:'Стол', search:'Поиск товара...', send:'Отправить на стол', close:'Закрыть счёт', available:'Свободен', occupied:'Занят', empty:'Этот стол пуст.', sent:'Товары отправлены на стол.', confirm:'Закрыть счёт этого стола?'},
+        tr: {tables:'Masalar', legend:'Yeşil masa boş, kırmızı masa dolu.', refresh:'Yenile', table:'Masa', search:'Ürün ara...', send:'Masaya gönder', close:'Hesabı kapat', available:'Boş', occupied:'Dolu', empty:'Bu masa boş.', sent:'Ürünler masaya gönderildi.', confirm:'Bu masanın hesabı kapatılsın mı?'}
+      };
+      let currentLang = localStorage.getItem('pos_lang') || 'az';
+      const t = key => (translations[currentLang] || translations.az)[key] || key;
+      function applyLanguage(lang) {
+        currentLang = translations[lang] ? lang : 'az';
+        document.querySelectorAll('[data-i18n]').forEach(el => el.textContent = t(el.dataset.i18n));
+        document.querySelectorAll('[data-i18n-placeholder]').forEach(el => el.placeholder = t(el.dataset.i18nPlaceholder));
+        document.getElementById('tables-lang-select').value = currentLang;
+        document.documentElement.lang = currentLang;
+        localStorage.setItem('pos_lang', currentLang);
+        renderTables();
+        renderSummary();
+      }
 
       function escapeHtml(value) {
         return String(value).replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[ch]));
@@ -68,7 +94,7 @@
         return `<button class="table-circle ${table.occupied ? 'occupied' : 'available'}" type="button" onclick="openTableModal(${table.number})">
           <span class="table-number">${escapeHtml(table.name)}</span>
           <span class="table-category">${escapeHtml(table.category)}</span>
-          <span class="table-status">${table.occupied ? 'Dolu' : 'Boş'}</span>
+          <span class="table-status">${table.occupied ? t('occupied') : t('available')}</span>
           ${table.occupied ? `<span class="table-total">${total.toFixed(2)} AZN</span>` : ''}
         </button>`;
       }
@@ -93,7 +119,7 @@
         });
         document.getElementById('table-order-summary').innerHTML = combined.length
           ? combined.map(item => `<div><span>${escapeHtml(item.name)} × ${item.quantity}</span><strong>${item.line_total.toFixed(2)} AZN</strong></div>`).join('')
-          : '<p>Bu masa hələ boşdur.</p>';
+          : `<p>${t('empty')}</p>`;
       }
       function addPendingProduct(id) {
         const product = products.find(item => item.id === id);
@@ -106,7 +132,7 @@
       function openTableModal(number) {
         selectedTable = tables.find(table => table.number === number);
         pendingCart = [];
-        document.getElementById('modal-title').textContent = `Masa ${number}`;
+        document.getElementById('modal-title').textContent = `${t('table')} ${number}`;
         document.getElementById('table-modal').hidden = false;
         document.getElementById('table-message').textContent = '';
         renderProducts();
@@ -144,11 +170,11 @@
         if (!response.ok) return;
         pendingCart = [];
         await loadTables();
-        document.getElementById('table-message').textContent = 'Məhsullar masaya göndərildi.';
+        document.getElementById('table-message').textContent = t('sent');
       });
       document.getElementById('close-table-bill').addEventListener('click', async () => {
         if (!selectedTable || !selectedTable.occupied) return;
-        if (!confirm('Bu masanın hesabı bağlansın?')) return;
+        if (!confirm(t('confirm'))) return;
         const response = await fetch(`/api/tables/${selectedTable.number}/close`, {method: 'POST'});
         const result = await response.json();
         document.getElementById('table-message').textContent = result.message;
@@ -156,6 +182,8 @@
         await loadTables();
         closeTableModal();
       });
+      document.getElementById('tables-lang-select').addEventListener('change', event => applyLanguage(event.target.value));
+      applyLanguage(currentLang);
       Promise.all([loadProducts(), loadTables()]).catch(error => {
         document.getElementById('tables-grid').innerHTML = `<p class="error-state">${escapeHtml(error.message)}</p>`;
       });

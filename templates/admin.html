@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="az">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Admin səlahiyyətləri</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}?v=20260904-rb19">
+  </head>
+  <body>
+    <div class="page-header">
+      <div class="page-title">
+        <h1>Admin idarəetməsi</h1>
+        <p class="page-subtitle">Müştərinin istifadə edə biləcəyi bölmələri seçin</p>
+      </div>
+      <div class="page-actions">
+        <nav class="page-nav">
+          <a href="/">Məhsullar</a>
+          <a href="/tables">Masalar</a>
+          <a href="/open-orders">Açıq qalanlar</a>
+          <a href="/operations">Əməliyyatlar</a>
+          <a href="/reports">Hesabatlar</a>
+        </nav>
+        <div class="user-chip">
+          <span>Admin</span>
+          <a href="{{ url_for('logout') }}" class="logout-link">Çıxış</a>
+        </div>
+      </div>
+    </div>
+
+    <main class="container">
+      <section class="card operations-card">
+        <h2>Bölmə səlahiyyətləri</h2>
+        <p>Bağlanan bölmələrə satıcı və müdir daxil ola bilməyəcək.</p>
+        <div class="admin-permissions">
+          {% for key, label in {
+            'products': 'Məhsullar',
+            'tables': 'Masalar',
+            'open_orders': 'Açıq qalanlar',
+            'operations': 'Əməliyyatlar',
+            'reports': 'Hesabatlar'
+          }.items() %}
+            <label class="permission-row">
+              <span>{{ label }}</span>
+              <input type="checkbox" data-feature="{{ key }}" {% if permissions[key] %}checked{% endif %}>
+            </label>
+          {% endfor %}
+        </div>
+        <button id="save-permissions" class="btn" type="button">Səlahiyyətləri yadda saxla</button>
+        <div id="permission-message" class="form-message" aria-live="polite"></div>
+      </section>
+    </main>
+
+    <script>
+      document.getElementById('save-permissions').addEventListener('click', async () => {
+        const permissions = {};
+        document.querySelectorAll('[data-feature]').forEach((input) => {
+          permissions[input.dataset.feature] = input.checked;
+        });
+        const response = await fetch('/api/admin/permissions', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify(permissions)
+        });
+        const result = await response.json();
+        const message = document.getElementById('permission-message');
+        message.textContent = result.message || (result.success ? 'Səlahiyyətlər yadda saxlanıldı.' : 'Əməliyyat uğursuz oldu.');
+      });
+    </script>
+  </body>
+</html>

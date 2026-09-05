@@ -50,7 +50,11 @@ PIN-lər artıq `.env` dəyişənlərindən oxunur:
 
 - `SELLER_PIN`
 - `MANAGER_PIN`
+- `ADMIN_PIN`
 - `SECRET_KEY`
+
+`ADMIN_PIN` verilməsə, lokal inkişaf üçün `414541` istifadə olunur. Production-da
+öz admin PIN-inizi Railway Variables bölməsində təyin edin.
 
 ### 6. Audit və təhlükəsizlik
 
@@ -85,8 +89,14 @@ Brauzerdə aç: `http://127.0.0.1:5000`
    - `SECRET_KEY`: uzun, təsadüfi, ən azı 32 simvolluq dəyər
    - `SELLER_PIN`: yalnız satıcının bildiyi yeni PIN
    - `MANAGER_PIN`: satıcı PIN-indən fərqli, yeni rəhbər PIN-i
+   - `ADMIN_PIN`: yalnız sistem sahibinin bildiyi admin PIN-i
 5. `FLASK_DEBUG` dəyişənini əlavə etmə və production-da `True` etmə.
 6. Deploy et və Railway-in verdiyi public domain üzərindən giriş səhifəsini yoxla.
+
+Admin PIN-i ilə daxil olduqda `/admin` səhifəsindən Məhsullar, Masalar, Açıq qalanlar,
+Əməliyyatlar və Hesabatlar bölmələrini satıcı və müdir üçün ayrıca bloklamaq/açmaq olar.
+Yanlış 6 rəqəmli admin PIN-i cəhdləri 3 səhvdən sonra 30 saniyə, sonra 60, 120 və
+artan intervallarla bloklanır.
 
 `DATABASE_URL`, `SECRET_KEY` və PIN-ləri GitHub-a, README-yə və ya source fayllarına yazma. Bu dəyişənlər yalnız Railway Variables bölməsində saxlanmalıdır.
 

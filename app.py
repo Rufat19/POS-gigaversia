@@ -6,6 +6,7 @@ PostgreSQL (via DATABASE_URL).
 """
 
 import os
+import time
 from datetime import datetime, timedelta
 from pathlib import Path
 import sqlite3
@@ -34,6 +35,7 @@ database_url = os.getenv("DATABASE_URL")
 secret_key = os.getenv("SECRET_KEY")
 seller_pin = os.getenv("SELLER_PIN")
 manager_pin = os.getenv("MANAGER_PIN")
+admin_pin = os.getenv("ADMIN_PIN", "414541")
 is_production = bool(
     os.getenv("RAILWAY_ENVIRONMENT")
     or os.getenv("RAILWAY_PROJECT_ID")
@@ -53,6 +55,15 @@ app.config["SESSION_COOKIE_SECURE"] = is_production
 PIN_USERS = {
     seller_pin or "1111": "seller",
     manager_pin or "1991": "manager",
+    admin_pin: "admin",
+}
+
+FEATURE_DEFAULTS = {
+    "products": True,
+    "tables": True,
+    "open_orders": True,
+    "operations": True,
+    "reports": True,
 }
 
 DEFAULT_PRODUCTS = [
@@ -174,6 +185,53 @@ def close_db(exc=None):
         db.close()
 
 
+def _get_permissions(conn, database_url):
+    cur = conn.cursor()
+    try:
+        cur.execute("SELECT products, tables, open_orders, operations, reports FROM feature_permissions WHERE id = 1")
+        row = cur.fetchone()
+        if row is None:
+            return FEATURE_DEFAULTS.copy()
+        return {
+            "products": bool(_row_value(row, "products")),
+            "tables": bool(_row_value(row, "tables")),
+            "open_orders": bool(_row_value(row, "open_orders")),
+            "operations": bool(_row_value(row, "operations")),
+            "reports": bool(_row_value(row, "reports")),
+        }
+    finally:
+        cur.close()
+
+
+def _feature_for_endpoint(endpoint):
+    if endpoint in {"products_page", "checkout"} or endpoint in {
+        "add_product", "update_product", "delete_product"
+    }:
+        return "products"
+    if endpoint in {"tables_page", "tables_api", "table_products_api", "add_table_items", "close_table"}:
+        return "tables"
+    if endpoint in {"open_orders_page", "credit_orders_api", "add_credit_order_items", "pay_credit_order"}:
+        return "open_orders"
+    if endpoint in {"operations_page", "add_movement", "add_category", "rename_category", "delete_category",
+                    "add_table_category", "manage_table_category", "add_dining_table", "manage_dining_table"}:
+        return "operations"
+    if endpoint in {"reports_page", "api_reports"}:
+        return "reports"
+    return None
+
+
+@app.context_processor
+def inject_feature_permissions():
+    role = session.get("role")
+    if role == "admin":
+        return {"feature_enabled": lambda feature: True}
+    if "db" not in g:
+        return {"feature_enabled": lambda feature: True}
+    database_url, _ = get_db_config()
+    permissions = _get_permissions(g.db, database_url)
+    return {"feature_enabled": lambda feature: permissions.get(feature, True)}
+
+
 @app.before_request
 def enforce_access():
     """Restrict pages based on the logged-in user role."""
@@ -183,6 +241,16 @@ def enforce_access():
         return redirect(url_for('login_page'))
 
     role = session.get('role')
+    feature = _feature_for_endpoint(request.endpoint)
+    if role != "admin" and feature:
+        init_db()
+        database_url, _ = get_db_config()
+        if not _get_permissions(get_db(), database_url).get(feature, True):
+            if request.path.startswith("/api/") or request.method != "GET":
+                return jsonify({"success": False, "message": "Bu bölmə admin tərəfindən bloklanıb."}), 403
+            return abort(403)
+    if role == "admin":
+        return None
     protected_pages = {'operations_page', 'reports_page'}
     protected_actions = {
         'add_movement',
@@ -238,26 +306,109 @@ def _audit_event(conn, database_url, action, entity_type, entity_id=None, detail
 
 @app.route('/login', methods=['GET', 'POST'])
 def login_page():
-    """Authenticate a seller or manager using a 4-digit PIN."""
+    """Authenticate a seller, manager or administrator using a PIN."""
     if session.get('role'):
         return redirect(url_for('products_page'))
 
     error = None
     if request.method == 'POST':
         pin = str(request.form.get('pin', '')).strip()
+        init_db()
+        conn = get_db()
+        database_url, _ = get_db_config()
+        now = time.time()
+        security_key = "admin" if len(pin) >= 6 else None
+        if security_key:
+            blocked_until = _login_blocked_until(conn, database_url, security_key)
+            if blocked_until > now:
+                error = f'Admin PIN-i müvəqqəti bloklanıb. {int(blocked_until - now) + 1} saniyə sonra yenidən cəhd edin.'
+                return render_template('login.html', error=error)
         role = PIN_USERS.get(pin)
         if role:
+            if role == "admin" and security_key:
+                _reset_login_security(conn, database_url, security_key)
             session.clear()
             session['role'] = role
-            init_db()
-            conn = get_db()
-            database_url, _ = get_db_config()
             _audit_event(conn, database_url, "login", "session", details=role)
             conn.commit()
             return redirect(url_for('products_page'))
-        error = 'Yanlış PIN kodu.'
+        if security_key:
+            lock_seconds = _record_failed_login(conn, database_url, security_key)
+            conn.commit()
+            if lock_seconds:
+                error = f'Yanlış admin PIN-i. Çoxsaylı səhvdən sonra {lock_seconds} saniyəlik blok tətbiq edildi.'
+            else:
+                error = 'Yanlış PIN kodu.'
+        else:
+            error = 'Yanlış PIN kodu.'
 
     return render_template('login.html', error=error)
+
+
+def _login_blocked_until(conn, database_url, login_key):
+    cur = conn.cursor()
+    try:
+        placeholder = "%s" if database_url else "?"
+        cur.execute(
+            f"SELECT blocked_until FROM login_security WHERE login_key = {placeholder}",
+            (login_key,),
+        )
+        row = cur.fetchone()
+        return float(_row_value(row, "blocked_until") or 0) if row else 0
+    finally:
+        cur.close()
+
+
+def _record_failed_login(conn, database_url, login_key):
+    cur = conn.cursor()
+    try:
+        placeholder = "%s" if database_url else "?"
+        cur.execute(
+            f"SELECT failed_attempts FROM login_security WHERE login_key = {placeholder}",
+            (login_key,),
+        )
+        row = cur.fetchone()
+        attempts = int(_row_value(row, "failed_attempts") or 0) + 1 if row else 1
+        lock_seconds = 0
+        if attempts % 3 == 0:
+            lock_seconds = min(3600, 30 * (2 ** (attempts // 3 - 1)))
+        if database_url:
+            cur.execute(
+                """
+                INSERT INTO login_security (login_key, failed_attempts, blocked_until)
+                VALUES (%s, %s, %s)
+                ON CONFLICT (login_key) DO UPDATE SET
+                    failed_attempts = EXCLUDED.failed_attempts,
+                    blocked_until = EXCLUDED.blocked_until
+                """,
+                (login_key, attempts, time.time() + lock_seconds),
+            )
+        else:
+            cur.execute(
+                """
+                INSERT INTO login_security (login_key, failed_attempts, blocked_until)
+                VALUES (?, ?, ?)
+                ON CONFLICT(login_key) DO UPDATE SET
+                    failed_attempts = excluded.failed_attempts,
+                    blocked_until = excluded.blocked_until
+                """,
+                (login_key, attempts, time.time() + lock_seconds),
+            )
+        return lock_seconds
+    finally:
+        cur.close()
+
+
+def _reset_login_security(conn, database_url, login_key):
+    cur = conn.cursor()
+    try:
+        placeholder = "%s" if database_url else "?"
+        cur.execute(
+            f"DELETE FROM login_security WHERE login_key = {placeholder}",
+            (login_key,),
+        )
+    finally:
+        cur.close()
 
 
 @app.route('/logout')
@@ -416,6 +567,33 @@ def _create_tables_postgres(conn):
             """
             CREATE TABLE IF NOT EXISTS table_categories (
                 name VARCHAR(100) PRIMARY KEY
+            )
+            """
+        )
+        cur.execute(
+            """
+            CREATE TABLE IF NOT EXISTS feature_permissions (
+                id INTEGER PRIMARY KEY,
+                products BOOLEAN NOT NULL DEFAULT TRUE,
+                tables BOOLEAN NOT NULL DEFAULT TRUE,
+                open_orders BOOLEAN NOT NULL DEFAULT TRUE,
+                operations BOOLEAN NOT NULL DEFAULT TRUE,
+                reports BOOLEAN NOT NULL DEFAULT TRUE
+            )
+            """
+        )
+        cur.execute(
+            """
+            INSERT INTO feature_permissions (id) VALUES (1)
+            ON CONFLICT (id) DO NOTHING
+            """
+        )
+        cur.execute(
+            """
+            CREATE TABLE IF NOT EXISTS login_security (
+                login_key VARCHAR(50) PRIMARY KEY,
+                failed_attempts INTEGER NOT NULL DEFAULT 0,
+                blocked_until DOUBLE PRECISION NOT NULL DEFAULT 0
             )
             """
         )
@@ -603,6 +781,28 @@ def _create_tables_sqlite(conn):
             """
             CREATE TABLE IF NOT EXISTS table_categories (
                 name TEXT PRIMARY KEY
+            )
+            """
+        )
+        cur.execute(
+            """
+            CREATE TABLE IF NOT EXISTS feature_permissions (
+                id INTEGER PRIMARY KEY,
+                products INTEGER NOT NULL DEFAULT 1,
+                tables INTEGER NOT NULL DEFAULT 1,
+                open_orders INTEGER NOT NULL DEFAULT 1,
+                operations INTEGER NOT NULL DEFAULT 1,
+                reports INTEGER NOT NULL DEFAULT 1
+            )
+            """
+        )
+        cur.execute("INSERT OR IGNORE INTO feature_permissions (id) VALUES (1)")
+        cur.execute(
+            """
+            CREATE TABLE IF NOT EXISTS login_security (
+                login_key TEXT PRIMARY KEY,
+                failed_attempts INTEGER NOT NULL DEFAULT 0,
+                blocked_until REAL NOT NULL DEFAULT 0
             )
             """
         )
@@ -1205,6 +1405,59 @@ def reports_page():
         default_start=start.isoformat(),
         default_end=end.isoformat(),
     )
+
+
+@app.route('/admin')
+def admin_page():
+    """Render administrator-only feature access controls."""
+    if session.get("role") != "admin":
+        return abort(403)
+    init_db()
+    database_url, _ = get_db_config()
+    permissions = _get_permissions(get_db(), database_url)
+    return render_template("admin.html", permissions=permissions)
+
+
+@app.route('/api/admin/permissions', methods=['POST'])
+def update_admin_permissions():
+    """Update feature access switches; this endpoint is administrator-only."""
+    if session.get("role") != "admin":
+        return jsonify({"success": False, "message": "Yalnız admin bu ayarları dəyişə bilər."}), 403
+    data = request.get_json(silent=True) or {}
+    unknown = set(data) - set(FEATURE_DEFAULTS)
+    if unknown:
+        return jsonify({"success": False, "message": "Naməlum səlahiyyət bölməsi."}), 400
+    permissions = {key: bool(data.get(key, FEATURE_DEFAULTS[key])) for key in FEATURE_DEFAULTS}
+    conn = get_db()
+    database_url, _ = get_db_config()
+    cur = conn.cursor()
+    try:
+        values = tuple(permissions[key] for key in FEATURE_DEFAULTS)
+        if database_url:
+            cur.execute(
+                """
+                UPDATE feature_permissions
+                SET products = %s, tables = %s, open_orders = %s,
+                    operations = %s, reports = %s
+                WHERE id = 1
+                """,
+                values,
+            )
+        else:
+            cur.execute(
+                """
+                UPDATE feature_permissions
+                SET products = ?, tables = ?, open_orders = ?,
+                    operations = ?, reports = ?
+                WHERE id = 1
+                """,
+                values,
+            )
+        _audit_event(conn, database_url, "update_permissions", "feature_permissions", details=str(permissions))
+        conn.commit()
+    finally:
+        cur.close()
+    return jsonify({"success": True, "permissions": permissions})
 
 
 @app.route('/api/reports', methods=['POST'])

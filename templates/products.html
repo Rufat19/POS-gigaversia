@@ -26,16 +26,23 @@
           </label>
         </div>
         <nav class="page-nav">
-          <a href="/" class="active" data-i18n="nav.products">Məhsullar</a>
-          <a href="/tables">Masalar</a>
-          <a href="/open-orders" data-i18n="nav.openOrders">Açıq qalanlar</a>
-          {% if session.get('role') == 'manager' %}
-            <a href="/operations" data-i18n="nav.operations">Əməliyyatlar</a>
-            <a href="/reports" data-i18n="nav.reports">Hesabatlar</a>
+          {% if feature_enabled('products') %}
+            <a href="/" class="active" data-i18n="nav.products">Məhsullar</a>
           {% endif %}
+          {% if feature_enabled('tables') %}<a href="/tables">Masalar</a>{% endif %}
+          {% if feature_enabled('open_orders') %}<a href="/open-orders" data-i18n="nav.openOrders">Açıq qalanlar</a>{% endif %}
+          {% if session.get('role') in ('manager', 'admin') %}
+            {% if feature_enabled('operations') %}
+            <a href="/operations" data-i18n="nav.operations">Əməliyyatlar</a>
+            {% endif %}
+            {% if feature_enabled('reports') %}
+            <a href="/reports" data-i18n="nav.reports">Hesabatlar</a>
+            {% endif %}
+          {% endif %}
+          {% if session.get('role') == 'admin' %}<a href="/admin">Admin</a>{% endif %}
         </nav>
         <div class="user-chip">
-          <span id="session-role-label" data-i18n="role.seller">{{ 'Müdir' if session.get('role') == 'manager' else 'Satıcı' }}</span>
+          <span id="session-role-label" data-i18n="role.seller">{{ 'Admin' if session.get('role') == 'admin' else ('Müdir' if session.get('role') == 'manager' else 'Satıcı') }}</span>
           <a href="{{ url_for('logout') }}" class="logout-link" data-i18n="common.logout">Çıxış</a>
         </div>
       </div>
@@ -107,7 +114,7 @@
 
     <script>
       // App JS - improved and organized
-      const currentRole = '{{ "manager" if session.get("role") == "manager" else "seller" }}';
+      const currentRole = '{{ "admin" if session.get("role") == "admin" else ("manager" if session.get("role") == "manager" else "seller") }}';
       const translations = {
         az: {
           'nav.products': 'Məhsullar',
