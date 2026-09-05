@@ -29,7 +29,7 @@
           {% if feature_enabled('products') %}
             <a href="/" class="active" data-i18n="nav.products">Məhsullar</a>
           {% endif %}
-          {% if feature_enabled('tables') %}<a href="/tables">Masalar</a>{% endif %}
+          {% if feature_enabled('tables') %}<a href="/tables" data-i18n="nav.tables">Masalar</a>{% endif %}
           {% if feature_enabled('open_orders') %}<a href="/open-orders" data-i18n="nav.openOrders">Açıq qalanlar</a>{% endif %}
           {% if session.get('role') in ('manager', 'admin') %}
             {% if feature_enabled('operations') %}
@@ -39,7 +39,7 @@
             <a href="/reports" data-i18n="nav.reports">Hesabatlar</a>
             {% endif %}
           {% endif %}
-          {% if session.get('role') == 'admin' %}<a href="/admin">Admin</a>{% endif %}
+          {% if session.get('role') == 'admin' %}<a href="/admin" data-i18n="nav.admin">Admin</a>{% endif %}
         </nav>
         <div class="user-chip">
           <span id="session-role-label" data-i18n="role.seller">{{ 'Admin' if session.get('role') == 'admin' else ('Müdir' if session.get('role') == 'manager' else 'Satıcı') }}</span>
@@ -118,11 +118,14 @@
       const translations = {
         az: {
           'nav.products': 'Məhsullar',
+          'nav.tables': 'Masalar',
+          'nav.admin': 'Admin',
           'nav.openOrders': 'Açıq qalanlar',
           'nav.operations': 'Əməliyyatlar',
           'nav.reports': 'Hesabatlar',
           'role.seller': 'Satıcı',
           'role.manager': 'Müdir',
+          'role.admin': 'Admin',
           'common.logout': 'Çıxış',
           'common.home': '⌂',
           'common.newOrder': 'Yeni sifariş',
@@ -147,11 +150,14 @@
         },
         en: {
           'nav.products': 'Products',
+          'nav.tables': 'Tables',
+          'nav.admin': 'Admin',
           'nav.openOrders': 'Open orders',
           'nav.operations': 'Operations',
           'nav.reports': 'Reports',
           'role.seller': 'Seller',
           'role.manager': 'Manager',
+          'role.admin': 'Admin',
           'common.logout': 'Logout',
           'common.home': '⌂',
           'common.newOrder': 'New order',
@@ -176,11 +182,14 @@
         },
         ru: {
           'nav.products': 'Товары',
+          'nav.tables': 'Столы',
+          'nav.admin': 'Администратор',
           'nav.openOrders': 'Открытые заказы',
           'nav.operations': 'Операции',
           'nav.reports': 'Отчеты',
           'role.seller': 'Продавец',
           'role.manager': 'Менеджер',
+          'role.admin': 'Администратор',
           'common.logout': 'Выход',
           'common.home': '⌂',
           'common.newOrder': 'Новый заказ',
@@ -205,11 +214,14 @@
         },
         tr: {
           'nav.products': 'Ürünler',
+          'nav.tables': 'Masalar',
+          'nav.admin': 'Admin',
           'nav.openOrders': 'Açık siparişler',
           'nav.operations': 'İşlemler',
           'nav.reports': 'Raporlar',
           'role.seller': 'Satıcı',
           'role.manager': 'Yönetici',
+          'role.admin': 'Admin',
           'common.logout': 'Çıkış',
           'common.home': '⌂',
           'common.newOrder': 'Yeni sipariş',

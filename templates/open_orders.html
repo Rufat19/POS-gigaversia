@@ -25,16 +25,21 @@
           </label>
         </div>
         <nav class="page-nav">
-          <a href="/" class="nav-products">Məhsullar</a>
-          <a href="/tables">Masalar</a>
+          {% if feature_enabled('products') %}<a href="/" class="nav-products">Məhsullar</a>{% endif %}
+          {% if feature_enabled('tables') %}<a href="/tables" class="nav-tables">Masalar</a>{% endif %}
           <a href="/open-orders" class="active nav-open-orders">Açıq qalanlar</a>
-          {% if session.get('role') == 'manager' %}
+          {% if session.get('role') in ('manager', 'admin') %}
+            {% if feature_enabled('operations') %}
             <a href="/operations" class="nav-operations">Əməliyyatlar</a>
+            {% endif %}
+            {% if feature_enabled('reports') %}
             <a href="/reports" class="nav-reports">Hesabatlar</a>
+            {% endif %}
           {% endif %}
+          {% if session.get('role') == 'admin' %}<a href="/admin" class="nav-admin">Admin</a>{% endif %}
         </nav>
         <div class="user-chip">
-          <span class="role-label">{{ 'Müdir' if session.get('role') == 'manager' else 'Satıcı' }}</span>
+          <span class="role-label">{{ 'Admin' if session.get('role') == 'admin' else ('Müdir' if session.get('role') == 'manager' else 'Satıcı') }}</span>
           <a href="{{ url_for('logout') }}" class="logout-link">Çıxış</a>
         </div>
       </div>
@@ -71,11 +76,11 @@
       </section>
     </main>
     <script>
-      const currentRole = '{{ "manager" if session.get("role") == "manager" else "seller" }}';
+      const currentRole = '{{ "admin" if session.get("role") == "admin" else ("manager" if session.get("role") == "manager" else "seller") }}';
       const translations = {
         az: {
           products: 'Məhsullar', openOrders: 'Açıq qalanlar', operations: 'Əməliyyatlar',
-          reports: 'Hesabatlar', manager: 'Müdir', seller: 'Satıcı', logout: 'Çıxış',
+          reports: 'Hesabatlar', tables: 'Masalar', admin: 'Admin', manager: 'Müdir', seller: 'Satıcı', administrator: 'Admin', logout: 'Çıxış',
           title: 'Açıq qalanlar', back: 'Məhsullara qayıt', history: 'Borc tarixçəsi',
           paid: 'Ödənilib', paidAmount: 'Ödənilən', total: 'Ümumi', remaining: 'Qalıq',
           addProduct: 'Məhsul əlavə et', partialPayment: 'Hissəli ödəniş',
@@ -88,7 +93,7 @@
         },
         en: {
           products: 'Products', openOrders: 'Open orders', operations: 'Operations',
-          reports: 'Reports', manager: 'Manager', seller: 'Seller', logout: 'Logout',
+          reports: 'Reports', tables: 'Tables', admin: 'Admin', manager: 'Manager', seller: 'Seller', administrator: 'Admin', logout: 'Logout',
           title: 'Open orders', back: 'Back to products', history: 'Credit history',
           paid: 'Paid', paidAmount: 'Paid', total: 'Total', remaining: 'Remaining',
           addProduct: 'Add products', partialPayment: 'Partial payment',
@@ -101,7 +106,7 @@
         },
         ru: {
           products: 'Товары', openOrders: 'Открытые заказы', operations: 'Операции',
-          reports: 'Отчеты', manager: 'Менеджер', seller: 'Продавец', logout: 'Выход',
+          reports: 'Отчеты', tables: 'Столы', admin: 'Администратор', manager: 'Менеджер', seller: 'Продавец', administrator: 'Администратор', logout: 'Выход',
           title: 'Открытые заказы', back: 'К товарам', history: 'История долгов',
           paid: 'Оплачено', paidAmount: 'Оплачено', total: 'Всего', remaining: 'Остаток',
           addProduct: 'Добавить товары', partialPayment: 'Частичная оплата',
@@ -114,7 +119,7 @@
         },
         tr: {
           products: 'Ürünler', openOrders: 'Açık siparişler', operations: 'İşlemler',
-          reports: 'Raporlar', manager: 'Yönetici', seller: 'Satıcı', logout: 'Çıkış',
+          reports: 'Raporlar', tables: 'Masalar', admin: 'Admin', manager: 'Yönetici', seller: 'Satıcı', administrator: 'Admin', logout: 'Çıkış',
           title: 'Açık siparişler', back: 'Ürünlere dön', history: 'Borç geçmişi',
           paid: 'Ödendi', paidAmount: 'Ödenen', total: 'Toplam', remaining: 'Kalan',
           addProduct: 'Ürün ekle', partialPayment: 'Kısmi ödeme',
@@ -133,11 +138,15 @@
         const dict = translations[currentLang];
         document.querySelector('.nav-products').textContent = dict.products;
         document.querySelector('.nav-open-orders').textContent = dict.openOrders;
+        const tablesLink = document.querySelector('.nav-tables');
+        const adminLink = document.querySelector('.nav-admin');
+        if (tablesLink) tablesLink.textContent = dict.tables;
+        if (adminLink) adminLink.textContent = dict.admin;
         const operationsLink = document.querySelector('.nav-operations');
         const reportsLink = document.querySelector('.nav-reports');
         if (operationsLink) operationsLink.textContent = dict.operations;
         if (reportsLink) reportsLink.textContent = dict.reports;
-        document.querySelector('.role-label').textContent = currentRole === 'manager' ? dict.manager : dict.seller;
+        document.querySelector('.role-label').textContent = currentRole === 'admin' ? dict.administrator : (currentRole === 'manager' ? dict.manager : dict.seller);
         document.querySelector('.logout-link').textContent = dict.logout;
         document.querySelector('.open-orders-title').textContent = dict.title;
         document.querySelector('.back-products').textContent = dict.back;

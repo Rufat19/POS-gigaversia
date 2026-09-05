@@ -25,14 +25,15 @@
           </label>
         </div>
         <nav class="page-nav">
-          <a href="/" data-i18n="nav.products">Məhsullar</a>
-          <a href="/tables">Masalar</a>
-          <a href="/open-orders" data-i18n="nav.openOrders">Açıq qalanlar</a>
+          {% if feature_enabled('products') %}<a href="/" data-i18n="nav.products">Məhsullar</a>{% endif %}
+          {% if feature_enabled('tables') %}<a href="/tables" data-i18n="nav.tables">Masalar</a>{% endif %}
+          {% if feature_enabled('open_orders') %}<a href="/open-orders" data-i18n="nav.openOrders">Açıq qalanlar</a>{% endif %}
           <a href="/operations" class="active" data-i18n="nav.operations">Əməliyyatlar</a>
-          <a href="/reports" data-i18n="nav.reports">Hesabatlar</a>
+          {% if feature_enabled('reports') %}<a href="/reports" data-i18n="nav.reports">Hesabatlar</a>{% endif %}
+          {% if session.get('role') == 'admin' %}<a href="/admin" data-i18n="nav.admin">Admin</a>{% endif %}
         </nav>
         <div class="user-chip">
-          <span data-i18n="role.manager">Müdir</span>
+          <span id="role-label" data-i18n="role.manager">{{ 'Admin' if session.get('role') == 'admin' else 'Müdir' }}</span>
           <a href="{{ url_for('logout') }}" class="logout-link" data-i18n="common.logout">Çıxış</a>
         </div>
       </div>
@@ -304,10 +305,13 @@
       const translations = {
         az: {
           'nav.products': 'Məhsullar',
+          'nav.tables': 'Masalar',
+          'nav.admin': 'Admin',
           'nav.openOrders': 'Açıq qalanlar',
           'nav.operations': 'Əməliyyatlar',
           'nav.reports': 'Hesabatlar',
           'role.manager': 'Müdir',
+          'role.admin': 'Admin',
           'common.logout': 'Çıxış',
           'operations.categories': 'Kateqoriyalar',
           'operations.newCategory': 'Yeni kateqoriya',
@@ -374,10 +378,13 @@
         },
         en: {
           'nav.products': 'Products',
+          'nav.tables': 'Tables',
+          'nav.admin': 'Admin',
           'nav.openOrders': 'Open orders',
           'nav.operations': 'Operations',
           'nav.reports': 'Reports',
           'role.manager': 'Manager',
+          'role.admin': 'Admin',
           'common.logout': 'Logout',
           'operations.categories': 'Categories',
           'operations.newCategory': 'New category',
@@ -444,10 +451,13 @@
         },
         ru: {
           'nav.products': 'Товары',
+          'nav.tables': 'Столы',
+          'nav.admin': 'Администратор',
           'nav.openOrders': 'Открытые заказы',
           'nav.operations': 'Операции',
           'nav.reports': 'Отчеты',
           'role.manager': 'Менеджер',
+          'role.admin': 'Администратор',
           'common.logout': 'Выход',
           'operations.categories': 'Категории',
           'operations.newCategory': 'Новая категория',
@@ -514,10 +524,13 @@
         },
         tr: {
           'nav.products': 'Ürünler',
+          'nav.tables': 'Masalar',
+          'nav.admin': 'Admin',
           'nav.openOrders': 'Açık siparişler',
           'nav.operations': 'İşlemler',
           'nav.reports': 'Raporlar',
           'role.manager': 'Yönetici',
+          'role.admin': 'Admin',
           'common.logout': 'Çıkış',
           'operations.categories': 'Kategoriler',
           'operations.newCategory': 'Yeni kategori',
@@ -591,9 +604,12 @@
         return dict[key] !== undefined ? dict[key] : key;
       }
 
+      const currentRole = '{{ "admin" if session.get("role") == "admin" else "manager" }}';
       function applyLanguage(lang) {
         currentLang = lang in translations ? lang : 'az';
         const dict = translations[currentLang];
+        const roleLabel = document.getElementById('role-label');
+        if (roleLabel) roleLabel.textContent = dict[currentRole === 'admin' ? 'role.admin' : 'role.manager'];
         document.querySelectorAll('[data-i18n]').forEach((el) => {
           if (dict[el.dataset.i18n] !== undefined) {
             el.textContent = dict[el.dataset.i18n];

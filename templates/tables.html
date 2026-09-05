@@ -18,19 +18,20 @@
           <option value="ru">Rus</option><option value="tr">Tur</option>
         </select>
         <nav class="page-nav">
-          {% if feature_enabled('products') %}<a href="/">Məhsullar</a>{% endif %}
+          {% if feature_enabled('products') %}<a href="/" data-i18n="products">Məhsullar</a>{% endif %}
           <a href="/tables" class="active" data-i18n="tables">Masalar</a>
-          {% if feature_enabled('open_orders') %}<a href="/open-orders">Açıq qalanlar</a>{% endif %}
+          {% if feature_enabled('open_orders') %}<a href="/open-orders" data-i18n="openOrders">Açıq qalanlar</a>{% endif %}
           {% if session.get('role') in ('manager', 'admin') %}
             {% if feature_enabled('operations') %}
-            <a href="/operations">Əməliyyatlar</a>
+            <a href="/operations" data-i18n="operations">Əməliyyatlar</a>
             {% endif %}
             {% if feature_enabled('reports') %}
-            <a href="/reports">Hesabatlar</a>
+            <a href="/reports" data-i18n="reports">Hesabatlar</a>
             {% endif %}
           {% endif %}
+          {% if session.get('role') == 'admin' %}<a href="/admin" data-i18n="admin">Admin</a>{% endif %}
         </nav>
-        <div class="user-chip">{{ 'Admin' if session.get('role') == 'admin' else ('Müdir' if session.get('role') == 'manager' else 'Satıcı') }} · <a href="/logout">Çıxış</a></div>
+        <div class="user-chip"><span id="role-label">{{ 'Admin' if session.get('role') == 'admin' else ('Müdir' if session.get('role') == 'manager' else 'Satıcı') }}</span> · <a href="/logout" data-i18n="logout">Çıxış</a></div>
       </div>
     </div>
     <main class="container tables-page">
@@ -67,11 +68,12 @@
       let products = [];
       let selectedTable = null;
       let pendingCart = [];
+      const currentRole = '{{ "admin" if session.get("role") == "admin" else ("manager" if session.get("role") == "manager" else "seller") }}';
       const translations = {
-        az: {tables:'Masalar', legend:'Yaşıl masa boşdur, qırmızı masa doludur.', refresh:'Yenilə', table:'Masa', search:'Məhsul axtar...', send:'Masaya göndər', close:'Hesabı bağla', available:'Boş', occupied:'Dolu', empty:'Bu masa hələ boşdur.', sent:'Məhsullar masaya göndərildi.', confirm:'Bu masanın hesabı bağlansın?'},
-        en: {tables:'Tables', legend:'Green is available, red is occupied.', refresh:'Refresh', table:'Table', search:'Search product...', send:'Send to table', close:'Close bill', available:'Available', occupied:'Occupied', empty:'This table is empty.', sent:'Products sent to table.', confirm:'Close this table bill?'},
-        ru: {tables:'Столы', legend:'Зелёный стол свободен, красный занят.', refresh:'Обновить', table:'Стол', search:'Поиск товара...', send:'Отправить на стол', close:'Закрыть счёт', available:'Свободен', occupied:'Занят', empty:'Этот стол пуст.', sent:'Товары отправлены на стол.', confirm:'Закрыть счёт этого стола?'},
-        tr: {tables:'Masalar', legend:'Yeşil masa boş, kırmızı masa dolu.', refresh:'Yenile', table:'Masa', search:'Ürün ara...', send:'Masaya gönder', close:'Hesabı kapat', available:'Boş', occupied:'Dolu', empty:'Bu masa boş.', sent:'Ürünler masaya gönderildi.', confirm:'Bu masanın hesabı kapatılsın mı?'}
+        az: {products:'Məhsullar', tables:'Masalar', openOrders:'Açıq qalanlar', operations:'Əməliyyatlar', reports:'Hesabatlar', admin:'Admin', manager:'Müdir', seller:'Satıcı', administrator:'Admin', logout:'Çıxış', legend:'Yaşıl masa boşdur, qırmızı masa doludur.', refresh:'Yenilə', table:'Masa', search:'Məhsul axtar...', send:'Masaya göndər', close:'Hesabı bağla', available:'Boş', occupied:'Dolu', empty:'Bu masa hələ boşdur.', sent:'Məhsullar masaya göndərildi.', confirm:'Bu masanın hesabı bağlansın?'},
+        en: {products:'Products', tables:'Tables', openOrders:'Open orders', operations:'Operations', reports:'Reports', admin:'Admin', manager:'Manager', seller:'Seller', administrator:'Admin', logout:'Logout', legend:'Green is available, red is occupied.', refresh:'Refresh', table:'Table', search:'Search product...', send:'Send to table', close:'Close bill', available:'Available', occupied:'Occupied', empty:'This table is empty.', sent:'Products sent to table.', confirm:'Close this table bill?'},
+        ru: {products:'Товары', tables:'Столы', openOrders:'Открытые заказы', operations:'Операции', reports:'Отчеты', admin:'Администратор', manager:'Менеджер', seller:'Продавец', administrator:'Администратор', logout:'Выход', legend:'Зелёный стол свободен, красный занят.', refresh:'Обновить', table:'Стол', search:'Поиск товара...', send:'Отправить на стол', close:'Закрыть счёт', available:'Свободен', occupied:'Занят', empty:'Этот стол пуст.', sent:'Товары отправлены на стол.', confirm:'Закрыть счёт этого стола?'},
+        tr: {products:'Ürünler', tables:'Masalar', openOrders:'Açık siparişler', operations:'İşlemler', reports:'Raporlar', admin:'Admin', manager:'Yönetici', seller:'Satıcı', administrator:'Admin', logout:'Çıkış', legend:'Yeşil masa boş, kırmızı masa dolu.', refresh:'Yenile', table:'Masa', search:'Ürün ara...', send:'Masaya gönder', close:'Hesabı kapat', available:'Boş', occupied:'Dolu', empty:'Bu masa boş.', sent:'Ürünler masaya gönderildi.', confirm:'Bu masanın hesabı kapatılsın mı?'}
       };
       let currentLang = localStorage.getItem('pos_lang') || 'az';
       const t = key => (translations[currentLang] || translations.az)[key] || key;
@@ -79,6 +81,7 @@
         currentLang = translations[lang] ? lang : 'az';
         document.querySelectorAll('[data-i18n]').forEach(el => el.textContent = t(el.dataset.i18n));
         document.querySelectorAll('[data-i18n-placeholder]').forEach(el => el.placeholder = t(el.dataset.i18nPlaceholder));
+        document.getElementById('role-label').textContent = t(currentRole === 'admin' ? 'administrator' : currentRole);
         document.getElementById('tables-lang-select').value = currentLang;
         document.documentElement.lang = currentLang;
         localStorage.setItem('pos_lang', currentLang);
