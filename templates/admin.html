@@ -48,6 +48,18 @@
         <button id="save-permissions" class="btn" type="button">Səlahiyyətləri yadda saxla</button>
         <div id="permission-message" class="form-message" aria-live="polite"></div>
       </section>
+      <section class="card operations-card">
+        <h2>İstifadəçilərin idarəsi</h2>
+        <p>Yalnız admin istifadəçi adı, rol və PIN yarada və dəyişə bilər.</p>
+        <div class="form-grid">
+          <label class="form-group"><span>İstifadəçi adı</span><input id="user-name" type="text"></label>
+          <label class="form-group"><span>Rol</span><select id="user-role"><option value="seller">Satıcı</option><option value="manager">Müdir</option></select></label>
+          <label class="form-group"><span>PIN</span><input id="user-pin" type="password" inputmode="numeric" maxlength="12"></label>
+          <div class="form-actions"><button id="create-user" class="btn" type="button">İstifadəçi yarat</button></div>
+        </div>
+        <div id="users-list" class="admin-users-list"></div>
+        <div id="user-message" class="form-message" aria-live="polite"></div>
+      </section>
     </main>
 
     <script>
@@ -56,6 +68,63 @@
         document.querySelectorAll('[data-feature]').forEach((input) => {
           permissions[input.dataset.feature] = input.checked;
         });
+
+        const userName = document.getElementById('user-name');
+        const userRole = document.getElementById('user-role');
+        const userPin = document.getElementById('user-pin');
+        const userMessage = document.getElementById('user-message');
+        async function loadUsers() {
+          const response = await fetch('/api/admin/users');
+          const result = await response.json();
+          if (!response.ok) throw new Error(result.message || 'İstifadəçilər yüklənmədi.');
+          document.getElementById('users-list').innerHTML = result.users.map(user => `
+            <div class="permission-row" data-user-id="${user.id}">
+              <input class="managed-user-name" value="${escapeHtml(user.username)}">
+              <select class="managed-user-role">
+                <option value="seller" ${user.role === 'seller' ? 'selected' : ''}>Satıcı</option>
+                <option value="manager" ${user.role === 'manager' ? 'selected' : ''}>Müdir</option>
+              </select>
+              <input class="managed-user-pin" type="password" inputmode="numeric" placeholder="Yeni PIN">
+              <button class="btn" type="button" onclick="updateUser(${user.id}, this)">Yadda saxla</button>
+              <button class="btn danger" type="button" onclick="deleteUser(${user.id})">Sil</button>
+            </div>`).join('');
+        }
+        function escapeHtml(value) {
+          return String(value).replace(/[&<>"']/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[char]));
+        }
+        async function updateUser(id, button) {
+          const row = button.closest('[data-user-id]');
+          const response = await fetch(`/api/admin/users/${id}`, {
+            method: 'PUT',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({
+              username: row.querySelector('.managed-user-name').value,
+              role: row.querySelector('.managed-user-role').value,
+              pin: row.querySelector('.managed-user-pin').value
+            })
+          });
+          const result = await response.json();
+          userMessage.textContent = result.message || (result.success ? 'İstifadəçi yeniləndi.' : 'Əməliyyat uğursuz oldu.');
+          if (result.success) loadUsers();
+        }
+        async function deleteUser(id) {
+          if (!confirm('Bu istifadəçi silinsin?')) return;
+          const response = await fetch(`/api/admin/users/${id}`, {method: 'DELETE'});
+          const result = await response.json();
+          userMessage.textContent = result.message || (result.success ? 'İstifadəçi silindi.' : 'Əməliyyat uğursuz oldu.');
+          if (result.success) loadUsers();
+        }
+        document.getElementById('create-user').addEventListener('click', async () => {
+          const response = await fetch('/api/admin/users', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({username: userName.value, role: userRole.value, pin: userPin.value})
+          });
+          const result = await response.json();
+          userMessage.textContent = result.message || (result.success ? 'İstifadəçi yaradıldı.' : 'Əməliyyat uğursuz oldu.');
+          if (result.success) { userName.value = ''; userPin.value = ''; loadUsers(); }
+        });
+        loadUsers();
         const response = await fetch('/api/admin/permissions', {
           method: 'POST',
           headers: {'Content-Type': 'application/json'},

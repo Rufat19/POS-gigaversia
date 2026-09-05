@@ -26,6 +26,7 @@ from flask import (
     url_for,
 )
 from psycopg2.extras import RealDictCursor
+from werkzeug.security import check_password_hash, generate_password_hash
 
 load_dotenv()
 
@@ -316,31 +317,30 @@ def login_page():
         init_db()
         conn = get_db()
         database_url, _ = get_db_config()
-        now = time.time()
-        security_key = "admin" if len(pin) >= 6 else None
-        if security_key:
-            blocked_until = _login_blocked_until(conn, database_url, security_key)
-            if blocked_until > now:
-                error = f'Admin PIN-i müvəqqəti bloklanıb. {int(blocked_until - now) + 1} saniyə sonra yenidən cəhd edin.'
-                return render_template('login.html', error=error)
         role = PIN_USERS.get(pin)
+        username = None
+        cur = conn.cursor()
+        try:
+            cur.execute(
+                "SELECT username, role, pin_hash FROM users WHERE active = TRUE"
+                if database_url
+                else "SELECT username, role, pin_hash FROM users WHERE active = 1"
+            )
+            for user in cur.fetchall():
+                if check_password_hash(_row_value(user, "pin_hash"), pin):
+                    username = _row_value(user, "username")
+                    role = _row_value(user, "role")
+                    break
+        finally:
+            cur.close()
         if role:
-            if role == "admin" and security_key:
-                _reset_login_security(conn, database_url, security_key)
             session.clear()
             session['role'] = role
+            session['username'] = username or ("Admin" if role == "admin" else role.title())
             _audit_event(conn, database_url, "login", "session", details=role)
             conn.commit()
             return redirect(url_for('products_page'))
-        if security_key:
-            lock_seconds = _record_failed_login(conn, database_url, security_key)
-            conn.commit()
-            if lock_seconds:
-                error = f'Yanlış admin PIN-i. Çoxsaylı səhvdən sonra {lock_seconds} saniyəlik blok tətbiq edildi.'
-            else:
-                error = 'Yanlış PIN kodu.'
-        else:
-            error = 'Yanlış PIN kodu.'
+        error = 'Yanlış PIN kodu.'
 
     return render_template('login.html', error=error)
 
@@ -597,6 +597,18 @@ def _create_tables_postgres(conn):
             )
             """
         )
+        cur.execute(
+            """
+            CREATE TABLE IF NOT EXISTS users (
+                id SERIAL PRIMARY KEY,
+                username VARCHAR(100) NOT NULL UNIQUE,
+                role VARCHAR(20) NOT NULL CHECK (role IN ('seller', 'manager')),
+                pin_hash TEXT NOT NULL,
+                active BOOLEAN NOT NULL DEFAULT TRUE,
+                created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+            )
+            """
+        )
 
         cur.execute("SELECT name FROM products")
         existing_names = set()
@@ -806,6 +818,18 @@ def _create_tables_sqlite(conn):
             )
             """
         )
+        cur.execute(
+            """
+            CREATE TABLE IF NOT EXISTS users (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                username TEXT NOT NULL UNIQUE,
+                role TEXT NOT NULL CHECK (role IN ('seller', 'manager')),
+                pin_hash TEXT NOT NULL,
+                active INTEGER NOT NULL DEFAULT 1,
+                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+            )
+            """
+        )
         cur.execute("SELECT name FROM products")
         existing_names = set()
         for row in cur.fetchall():
@@ -959,6 +983,36 @@ def init_db():
         _create_tables_sqlite(conn)
     _sync_categories(conn, database_url)
     _sync_table_definitions(conn, database_url)
+    _sync_default_users(conn, database_url)
+
+
+def _sync_default_users(conn, database_url):
+    defaults = (
+        ("Satıcı", "seller", seller_pin or "1111"),
+        ("Müdir", "manager", manager_pin or "1991"),
+    )
+    cur = conn.cursor()
+    try:
+        for username, role, pin in defaults:
+            placeholder = "%s" if database_url else "?"
+            cur.execute(
+                f"SELECT id FROM users WHERE role = {placeholder} LIMIT 1",
+                (role,),
+            )
+            if cur.fetchone() is None:
+                if database_url:
+                    cur.execute(
+                        "INSERT INTO users (username, role, pin_hash) VALUES (%s, %s, %s)",
+                        (username, role, generate_password_hash(pin)),
+                    )
+                else:
+                    cur.execute(
+                        "INSERT INTO users (username, role, pin_hash) VALUES (?, ?, ?)",
+                        (username, role, generate_password_hash(pin)),
+                    )
+        conn.commit()
+    finally:
+        cur.close()
 
 
 def _sync_table_definitions(conn, database_url):
@@ -1458,6 +1512,130 @@ def update_admin_permissions():
     finally:
         cur.close()
     return jsonify({"success": True, "permissions": permissions})
+
+
+def _require_admin():
+    if session.get("role") != "admin":
+        return jsonify({"success": False, "message": "Yalnız admin bu əməliyyatı edə bilər."}), 403
+    return None
+
+
+@app.route('/api/admin/users', methods=['GET', 'POST'])
+def admin_users():
+    denied = _require_admin()
+    if denied:
+        return denied
+    init_db()
+    conn = get_db()
+    database_url, _ = get_db_config()
+    cur = conn.cursor()
+    try:
+        if request.method == "GET":
+            cur.execute("SELECT id, username, role, active FROM users ORDER BY id")
+            users = [
+                {
+                    "id": _row_value(row, "id"),
+                    "username": _row_value(row, "username"),
+                    "role": _row_value(row, "role"),
+                    "active": bool(_row_value(row, "active")),
+                }
+                for row in cur.fetchall()
+            ]
+            return jsonify({"success": True, "users": users})
+
+        data = request.get_json(silent=True) or {}
+        username = str(data.get("username", "")).strip()
+        role = str(data.get("role", "")).strip()
+        pin = str(data.get("pin", "")).strip()
+        if not username or role not in {"seller", "manager"} or not pin.isdigit() or len(pin) < 4:
+            return jsonify({"success": False, "message": "Ad, rol və ən azı 4 rəqəmli PIN tələb olunur."}), 400
+        placeholder = "%s" if database_url else "?"
+        cur.execute(
+            f"SELECT id FROM users WHERE username = {placeholder}",
+            (username,),
+        )
+        if cur.fetchone():
+            return jsonify({"success": False, "message": "Bu istifadəçi adı artıq mövcuddur."}), 409
+        if database_url:
+            cur.execute(
+                "INSERT INTO users (username, role, pin_hash) VALUES (%s, %s, %s) RETURNING id",
+                (username, role, generate_password_hash(pin)),
+            )
+            user_id = _row_value(cur.fetchone(), "id")
+        else:
+            cur.execute(
+                "INSERT INTO users (username, role, pin_hash) VALUES (?, ?, ?)",
+                (username, role, generate_password_hash(pin)),
+            )
+            user_id = cur.lastrowid
+        _audit_event(conn, database_url, "user_created", "user", user_id, username)
+        conn.commit()
+        return jsonify({"success": True, "id": user_id})
+    except (sqlite3.Error, psycopg2.Error) as exc:
+        conn.rollback()
+        return jsonify({"success": False, "message": str(exc)}), 500
+    finally:
+        cur.close()
+
+
+@app.route('/api/admin/users/<int:user_id>', methods=['PUT', 'DELETE'])
+def manage_admin_user(user_id):
+    denied = _require_admin()
+    if denied:
+        return denied
+    init_db()
+    conn = get_db()
+    database_url, _ = get_db_config()
+    placeholder = "%s" if database_url else "?"
+    cur = conn.cursor()
+    try:
+        if request.method == "DELETE":
+            cur.execute(f"DELETE FROM users WHERE id = {placeholder}", (user_id,))
+            if cur.rowcount == 0:
+                return jsonify({"success": False, "message": "İstifadəçi tapılmadı."}), 404
+            conn.commit()
+            return jsonify({"success": True})
+
+        data = request.get_json(silent=True) or {}
+        username = str(data.get("username", "")).strip()
+        role = str(data.get("role", "")).strip()
+        pin = str(data.get("pin", "")).strip()
+        if not username or role not in {"seller", "manager"}:
+            return jsonify({"success": False, "message": "Ad və düzgün rol tələb olunur."}), 400
+        cur.execute(
+            f"SELECT id FROM users WHERE username = {placeholder} AND id != {placeholder}",
+            (username, user_id),
+        )
+        if cur.fetchone():
+            return jsonify({"success": False, "message": "Bu istifadəçi adı artıq mövcuddur."}), 409
+        if pin:
+            if not pin.isdigit() or len(pin) < 4:
+                return jsonify({"success": False, "message": "PIN ən azı 4 rəqəm olmalıdır."}), 400
+            if database_url:
+                cur.execute(
+                    "UPDATE users SET username = %s, role = %s, pin_hash = %s WHERE id = %s",
+                    (username, role, generate_password_hash(pin), user_id),
+                )
+            else:
+                cur.execute(
+                    "UPDATE users SET username = ?, role = ?, pin_hash = ? WHERE id = ?",
+                    (username, role, generate_password_hash(pin), user_id),
+                )
+        else:
+            cur.execute(
+                f"UPDATE users SET username = {placeholder}, role = {placeholder} WHERE id = {placeholder}",
+                (username, role, user_id),
+            )
+        if cur.rowcount == 0:
+            return jsonify({"success": False, "message": "İstifadəçi tapılmadı."}), 404
+        _audit_event(conn, database_url, "user_updated", "user", user_id, username)
+        conn.commit()
+        return jsonify({"success": True})
+    except (sqlite3.Error, psycopg2.Error) as exc:
+        conn.rollback()
+        return jsonify({"success": False, "message": str(exc)}), 500
+    finally:
+        cur.close()
 
 
 @app.route('/api/reports', methods=['POST'])

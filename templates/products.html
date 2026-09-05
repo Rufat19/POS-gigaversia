@@ -264,7 +264,7 @@
         });
         const roleLabel = document.getElementById('session-role-label');
         if (roleLabel) {
-          roleLabel.textContent = dict[currentRole === 'manager' ? 'role.manager' : 'role.seller'];
+          roleLabel.textContent = dict[currentRole === 'admin' ? 'role.admin' : (currentRole === 'manager' ? 'role.manager' : 'role.seller')];
         }
         const langSelect = document.getElementById('products-lang-select');
         if (langSelect) {
