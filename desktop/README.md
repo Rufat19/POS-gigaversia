@@ -20,6 +20,12 @@ npm start
 
 The app opens maximized with the menu bar hidden. It uses the existing Railway-hosted application, so logins and POS data remain on the server.
 
+## Background radio
+
+The compact RoBo Radio control appears on the signed-in POS pages. It lists jazz, lounge, and instrumental stations from the Radio Browser directory, remembers the selected station and sound settings, and attempts to resume playback when the app opens. Keep an internet connection available. Browsers may block autoplay until Play is pressed once.
+
+Radio station streams have their own usage terms. Confirm that a station and any required local public-performance license allow playback in a restaurant before using it for business.
+
 ## Set a custom Windows icon
 
 From this folder, create the assets directory, then copy your Windows `.ico` file there:

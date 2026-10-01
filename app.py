@@ -75,6 +75,7 @@ FEATURE_DEFAULTS = {
     "open_orders": True,
     "operations": True,
     "reports": True,
+    "radio": True,
 }
 
 DEFAULT_PRODUCTS = [
@@ -199,7 +200,10 @@ def close_db(exc=None):
 def _get_permissions(conn, database_url):
     cur = conn.cursor()
     try:
-        cur.execute("SELECT products, tables, open_orders, operations, reports FROM feature_permissions WHERE id = 1")
+        cur.execute(
+            "SELECT products, tables, open_orders, operations, reports, radio "
+            "FROM feature_permissions WHERE id = 1"
+        )
         row = cur.fetchone()
         if row is None:
             return FEATURE_DEFAULTS.copy()
@@ -209,6 +213,7 @@ def _get_permissions(conn, database_url):
             "open_orders": bool(_row_value(row, "open_orders")),
             "operations": bool(_row_value(row, "operations")),
             "reports": bool(_row_value(row, "reports")),
+            "radio": bool(_row_value(row, "radio")),
         }
     finally:
         cur.close()
@@ -234,12 +239,16 @@ def _feature_for_endpoint(endpoint):
 @app.context_processor
 def inject_feature_permissions():
     role = session.get("role")
-    if role == "admin":
-        return {"feature_enabled": lambda feature: True}
     if "db" not in g:
         return {"feature_enabled": lambda feature: True}
     database_url, _ = get_db_config()
     permissions = _get_permissions(g.db, database_url)
+    if role == "admin":
+        return {
+            "feature_enabled": lambda feature: (
+                permissions.get(feature, True) if feature == "radio" else True
+            )
+        }
     return {"feature_enabled": lambda feature: permissions.get(feature, True)}
 
 
@@ -588,9 +597,13 @@ def _create_tables_postgres(conn):
                 tables BOOLEAN NOT NULL DEFAULT TRUE,
                 open_orders BOOLEAN NOT NULL DEFAULT TRUE,
                 operations BOOLEAN NOT NULL DEFAULT TRUE,
-                reports BOOLEAN NOT NULL DEFAULT TRUE
+                reports BOOLEAN NOT NULL DEFAULT TRUE,
+                radio BOOLEAN NOT NULL DEFAULT TRUE
             )
             """
+        )
+        cur.execute(
+            "ALTER TABLE feature_permissions ADD COLUMN IF NOT EXISTS radio BOOLEAN NOT NULL DEFAULT TRUE"
         )
         cur.execute(
             """
@@ -814,10 +827,17 @@ def _create_tables_sqlite(conn):
                 tables INTEGER NOT NULL DEFAULT 1,
                 open_orders INTEGER NOT NULL DEFAULT 1,
                 operations INTEGER NOT NULL DEFAULT 1,
-                reports INTEGER NOT NULL DEFAULT 1
+                reports INTEGER NOT NULL DEFAULT 1,
+                radio INTEGER NOT NULL DEFAULT 1
             )
             """
         )
+        cur.execute("PRAGMA table_info(feature_permissions)")
+        permission_columns = {row[1] for row in cur.fetchall()}
+        if "radio" not in permission_columns:
+            cur.execute(
+                "ALTER TABLE feature_permissions ADD COLUMN radio INTEGER NOT NULL DEFAULT 1"
+            )
         cur.execute("INSERT OR IGNORE INTO feature_permissions (id) VALUES (1)")
         cur.execute(
             """
@@ -1523,7 +1543,7 @@ def update_admin_permissions():
                 """
                 UPDATE feature_permissions
                 SET products = %s, tables = %s, open_orders = %s,
-                    operations = %s, reports = %s
+                    operations = %s, reports = %s, radio = %s
                 WHERE id = 1
                 """,
                 values,
@@ -1533,7 +1553,7 @@ def update_admin_permissions():
                 """
                 UPDATE feature_permissions
                 SET products = ?, tables = ?, open_orders = ?,
-                    operations = ?, reports = ?
+                    operations = ?, reports = ?, radio = ?
                 WHERE id = 1
                 """,
                 values,

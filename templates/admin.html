@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Admin səlahiyyətləri</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}?v=20261001-warm-buttons">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}?v=20261001-radio">
   </head>
   <body>
     <div class="page-header">
@@ -40,7 +40,8 @@
             'tables': 'Masalar',
             'open_orders': 'Açıq qalanlar',
             'operations': 'Əməliyyatlar',
-            'reports': 'Hesabatlar'
+            'reports': 'Hesabatlar',
+            'radio': 'Fon musiqisi (Radio)'
           }.items() %}
             <label class="permission-row">
               <span>{{ label }}</span>
@@ -90,6 +91,15 @@
         const result = await response.json();
         const message = document.getElementById('permission-message');
         message.textContent = result.message || (result.success ? 'Səlahiyyətlər yadda saxlanıldı.' : 'Əməliyyat uğursuz oldu.');
+        if (result.success) {
+          const radioDock = document.getElementById('radio-dock');
+          if (radioDock && !permissions.radio) {
+            document.getElementById('radio-audio').pause();
+            radioDock.remove();
+          } else if (!radioDock && permissions.radio) {
+            location.reload();
+          }
+        }
       });
 
       const userName = document.getElementById('user-name');
@@ -149,5 +159,6 @@
       });
       loadUsers();
     </script>
+    {% if feature_enabled('radio') %}{% include '_radio_player.html' %}{% endif %}
   </body>
 </html>

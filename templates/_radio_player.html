@@ -1,0 +1,28 @@
+<section class="radio-dock" id="radio-dock" aria-label="Fon musiqisi" aria-busy="true">
+  <audio id="radio-audio" preload="none"></audio>
+  <div class="radio-dock-main">
+    <div class="radio-dock-brand">
+      <span class="radio-dock-icon" id="radio-icon" aria-hidden="true">♫</span>
+      <div class="radio-dock-info">
+        <span class="radio-dock-label" data-radio-label>RoBo Radio</span>
+        <span class="radio-dock-station" id="radio-station-name">...</span>
+      </div>
+    </div>
+    <div class="radio-dock-controls">
+      <button type="button" id="radio-previous" data-radio-title="previous" aria-label="Əvvəlki stansiya" title="Əvvəlki stansiya">‹</button>
+      <button type="button" id="radio-play" class="radio-play" data-radio-title="play" aria-label="Radionu başlat" title="Radionu başlat">▶</button>
+      <button type="button" id="radio-next" data-radio-title="next" aria-label="Növbəti stansiya" title="Növbəti stansiya">›</button>
+      <button type="button" id="radio-mute" data-radio-title="mute" aria-label="Səsi kəs" title="Səsi kəs">◖</button>
+      <button type="button" id="radio-expand" class="radio-expand" aria-label="Radio ayarlarını aç" aria-expanded="false" title="Radio ayarlarını aç">⌄</button>
+    </div>
+  </div>
+  <div class="radio-dock-settings" id="radio-settings" hidden>
+    <select id="radio-stations" aria-label="Radio stansiyası"></select>
+    <label class="radio-volume">
+      <span aria-hidden="true">♪</span>
+      <input id="radio-volume" type="range" min="0" max="100" value="20" aria-label="Səs səviyyəsi">
+    </label>
+  </div>
+  <p class="radio-dock-status" id="radio-status" role="status" aria-live="polite"></p>
+</section>
+<script defer src="{{ url_for('static', filename='js/radio-player.js') }}?v=20261001-2"></script>

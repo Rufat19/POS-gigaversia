@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Əməliyyatlar - Anbar hərəkətləri</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}?v=20261001-warm-buttons">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}?v=20261001-radio">
   </head>
   <body>
     <div class="page-header">
@@ -849,5 +849,6 @@
         languageSelect.addEventListener('change', (event) => applyLanguage(event.target.value));
       }
     </script>
+    {% if feature_enabled('radio') %}{% include '_radio_player.html' %}{% endif %}
   </body>
 </html>

@@ -9,6 +9,8 @@ const ICON_PATH = path.join(__dirname, 'assets', 'robo.ico');
 
 let mainWindow;
 
+app.commandLine.appendSwitch('autoplay-policy', 'no-user-gesture-required');
+
 function isTrustedAppUrl(value) {
   try {
     return new URL(value).origin === APP_ORIGIN;
