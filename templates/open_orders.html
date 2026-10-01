@@ -32,7 +32,7 @@
           {% if session.get('role') in ('manager', 'admin') and feature_enabled('operations') %}
             <a href="/operations" class="nav-operations">Əməliyyatlar</a>
           {% endif %}
-          <a href="/sales-history" data-i18n="salesHistory">Satış tarixçəsi</a>
+          <a href="/sales-history" class="nav-sales-history">Satış tarixçəsi</a>
           {% if session.get('role') in ('manager', 'admin') and feature_enabled('reports') %}
             <a href="/reports" class="nav-reports">Hesabatlar</a>
           {% endif %}
@@ -141,6 +141,7 @@
         const dict = translations[currentLang];
         document.querySelector('.nav-products').textContent = dict.products;
         document.querySelector('.nav-open-orders').textContent = dict.openOrders;
+        document.querySelector('.nav-sales-history').textContent = dict.salesHistory;
         const tablesLink = document.querySelector('.nav-tables');
         const adminLink = document.querySelector('.nav-admin');
         if (tablesLink) tablesLink.textContent = dict.tables;
