@@ -1438,6 +1438,7 @@ def _process_stock_movement_common(conn, placeholder, movement):
     insert_sql = (
         f'INSERT INTO stock_movements (product_id, type, quantity, note) '
         f'VALUES ({placeholder}, {placeholder}, {placeholder}, {placeholder})'
+        f'{" RETURNING id" if placeholder == "%s" else ""}'
     )
     update_sql = (
         f'UPDATE products SET stock = stock + {placeholder} WHERE id = {placeholder}'

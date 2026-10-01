@@ -105,8 +105,9 @@ html{scroll-behavior:smooth}
 .management-row span{display:block;color:#64748b;font-size:0.78rem;margin-top:4px;}
 .btn,.add-btn{appearance:none;border:none;border-radius:12px;padding:10px 14px;font-size:0.82rem;font-weight:800;letter-spacing:0.01em;cursor:pointer;transition:all .2s ease;display:inline-flex;align-items:center;justify-content:center;gap:6px;}
 .btn:hover,.add-btn:hover{transform:translateY(-1px);}
-.btn.primary,.add-btn{background:linear-gradient(135deg,#5ecce5,#1d8ea8);color:#fff;box-shadow:0 12px 26px rgba(29,142,168,0.18);}
-.btn.secondary{background:#edf6ff;color:#0f4d5d;border:1px solid rgba(29,142,168,0.14);}
+.btn.primary,.add-btn{background:#715543;color:#fff;box-shadow:0 4px 10px rgba(67,48,35,0.10);}
+.btn.primary:hover,.add-btn:hover{background:#5e4535;box-shadow:0 5px 12px rgba(67,48,35,0.14);}
+.btn.secondary{background:#f4eee8;color:#654b39;border:1px solid #e6d9cd;}
 .btn.danger{background:#fff1f2;color:#b42318;border:1px solid rgba(190,24,93,0.14);}
 .operations-card .add-btn,
 .operations-card .btn{width:auto;height:auto;min-height:44px;padding:11px 16px;}
@@ -193,7 +194,7 @@ html{scroll-behavior:smooth}
 .product-actions-row{display:flex;align-items:center;gap:8px;margin-top:12px;}
 .qty-input{width:74px;padding:9px 10px;border-radius:12px;border:1px solid rgba(255,255,255,0.18);background:rgba(255,255,255,0.08);color:#fff;font-size:0.82rem;}
 .qty-input::placeholder{color:rgba(255,255,255,0.62);}
-.add-btn{width:42px;height:42px;border:none;border-radius:12px;background:linear-gradient(135deg,#73d7e9,#1d8ea8);color:#fff;font-size:1.5rem;line-height:1;cursor:pointer;box-shadow:0 12px 28px rgba(29,142,168,0.30);}
+.add-btn{width:42px;height:42px;border:none;border-radius:12px;background:#715543;color:#fff;font-size:1.5rem;line-height:1;cursor:pointer;box-shadow:0 4px 10px rgba(67,48,35,0.12);}
 .cart-box-main{background:rgba(255,255,255,0.8);-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);border-radius:24px;padding:18px 16px 16px;box-shadow:var(--pos-shadow);border:1px solid rgba(148,163,184,0.2);}
 .cart-header-row{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;}
 .cart-title{margin:0;font-size:1.5rem;color:#111827;}
@@ -237,7 +238,7 @@ html{scroll-behavior:smooth}
 .credit-order-card li strong{color:#1f2937;white-space:nowrap;}
 .credit-order-actions{display:flex;gap:8px;flex-wrap:wrap;}
 .btn.primary,.pay-btn{border:0;border-radius:12px;padding:10px 13px;text-decoration:none;font-weight:800;cursor:pointer;}
-.btn.primary{background:linear-gradient(135deg,#5bc5d9,#1d8ea8);color:#fff;}
+.btn.primary{background:#715543;color:#fff;}
 .pay-btn{background:#dcfce7;color:#166534;}
 .paid-badge{display:inline-block;padding:8px 12px;border-radius:999px;background:#dcfce7;color:#166534;font-weight:800;}
 .empty-state,.error-state{padding:18px;background:rgba(255,255,255,0.75);border-radius:14px;color:#64748b;}
@@ -271,7 +272,13 @@ html{scroll-behavior:smooth}
 .table-settings-section{margin-top:20px;padding-top:16px;border-top:1px solid #e2e8f0;}
 .table-settings-section h3{margin:0 0 14px;color:#0f172a;font-size:1rem;}
 .table-settings-section .form-grid{grid-template-columns:repeat(2,minmax(0,1fr));}
-.table-settings-section .add-btn{width:fit-content;height:auto;min-width:max-content;min-height:44px;padding:11px 16px;font-size:.82rem;line-height:1.2;white-space:nowrap;}
+.table-settings-section .add-btn{width:fit-content;height:auto;min-width:max-content;min-height:44px;padding:11px 16px;font-size:.84rem;line-height:1.25;font-weight:650;letter-spacing:0;white-space:nowrap;}
+.table-settings-section .btn.secondary{background:#f4eee8;color:#654b39;border-color:#e6d9cd;}
+.operations-card .add-btn{width:auto;height:auto;min-height:44px;padding:11px 16px;font-size:.86rem;line-height:1.25;font-weight:650;letter-spacing:0;border-radius:10px;background:#715543;color:#fff;box-shadow:0 4px 10px rgba(67,48,35,0.10);}
+.operations-card .add-btn:hover{background:#5e4535;box-shadow:0 5px 12px rgba(67,48,35,0.14);}
+.operations-card .btn.secondary{background:#f4eee8;color:#654b39;border-color:#e6d9cd;}
+.operations-card .btn.secondary:hover,.table-settings-section .btn.secondary:hover{background:#ebe0d5;border-color:#dac8b8;}
+.btn:focus-visible,.add-btn:focus-visible{outline:3px solid rgba(113,85,67,0.3);outline-offset:2px;}
 .table-settings-card .table-management-list{max-height:260px;overflow:auto;}
 .table-modal-header{display:flex;justify-content:space-between;align-items:center;}
 .table-modal-header h2{margin:0;color:#0f172a;}
