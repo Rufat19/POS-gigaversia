@@ -7,7 +7,7 @@ PostgreSQL (via DATABASE_URL).
 
 import os
 import time
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 import sqlite3
 from typing import Any
@@ -863,7 +863,7 @@ def _create_tables_sqlite(conn):
 
 
 def _sync_categories(conn, database_url):
-    """Ensure category metadata stays aligned with product data."""
+    """Add categories found on products without deleting unused categories."""
     if database_url:
         cur = conn.cursor()
         try:
@@ -885,12 +885,6 @@ def _sync_categories(conn, database_url):
                     "INSERT INTO categories (name) VALUES (%s) ON CONFLICT (name) DO NOTHING",
                     (name,),
                 )
-            cur.execute(
-                "SELECT name FROM categories WHERE name NOT IN (SELECT DISTINCT category FROM products WHERE category IS NOT NULL)"
-            )
-            orphan_names = [row["name"] for row in cur.fetchall()]
-            for name in orphan_names:
-                cur.execute("DELETE FROM categories WHERE name = %s", (name,))
             conn.commit()
         finally:
             cur.close()
@@ -912,12 +906,6 @@ def _sync_categories(conn, database_url):
                     "INSERT OR IGNORE INTO categories (name) VALUES (?)",
                     (name,),
                 )
-            cur.execute(
-                "SELECT name FROM categories WHERE name NOT IN (SELECT DISTINCT category FROM products WHERE category IS NOT NULL)"
-            )
-            orphan_names = [row[0] for row in cur.fetchall()]
-            for name in orphan_names:
-                cur.execute("DELETE FROM categories WHERE name = ?", (name,))
             conn.commit()
         finally:
             cur.close()
@@ -1090,11 +1078,11 @@ def products_page():
 
 @app.route('/operations')
 def operations_page():
-    """Render operations page: add stock movements and show combined history."""
+    """Render operations page: add and review stock movements."""
     init_db()
     conn = get_db()
     database_url, _ = get_db_config()
-    end = datetime.utcnow().date()
+    end = datetime.now(timezone.utc).date()
     start = end - timedelta(days=6)
 
     # load products for dropdown
@@ -1119,24 +1107,13 @@ def operations_page():
         finally:
             cur.close()
 
-    # fetch combined history (sales items + stock_movements)
+    # Stock movement history stays separate from the sales history page.
     history = []
     if database_url:
         cur = conn.cursor()
         try:
-            # sales items
             cur.execute(
                 """
-                SELECT s.created_at AS created_at,
-                       p.name AS product_name,
-                       'sale' AS kind,
-                       si.quantity AS quantity,
-                       (si.unit_price * si.quantity) AS amount
-                FROM sale_items si
-                JOIN sales s ON si.sale_id = s.id
-                JOIN products p ON si.product_id = p.id
-                WHERE s.status = 'completed'
-                UNION ALL
                 SELECT sm.created_at AS created_at,
                        p.name AS product_name,
                        sm.type AS kind,
@@ -1155,16 +1132,6 @@ def operations_page():
         try:
             cur.execute(
                 """
-                SELECT s.created_at AS created_at,
-                       p.name AS product_name,
-                       'sale' AS kind,
-                       si.quantity AS quantity,
-                       (si.unit_price * si.quantity) AS amount
-                FROM sale_items si
-                JOIN sales s ON si.sale_id = s.id
-                JOIN products p ON si.product_id = p.id
-                WHERE s.status = 'completed'
-                UNION ALL
                 SELECT sm.created_at AS created_at,
                        p.name AS product_name,
                        sm.type AS kind,
@@ -1180,23 +1147,76 @@ def operations_page():
             cur.close()
 
     categories = _get_categories(conn, database_url)
-    cur = conn.cursor()
-    try:
-        cur.execute("SELECT table_number, name, category FROM dining_tables ORDER BY table_number")
-        dining_tables = cur.fetchall()
-        cur.execute("SELECT name FROM table_categories ORDER BY name")
-        table_categories = [_row_value(row, "name") for row in cur.fetchall()]
-    finally:
-        cur.close()
     return render_template(
         'operations.html',
         products=products,
         history=history,
         categories=categories,
-        dining_tables=dining_tables,
-        table_categories=table_categories,
         default_start=start.isoformat(),
         default_end=end.isoformat(),
+    )
+
+
+@app.route('/sales-history')
+def sales_history_page():
+    """Show completed sales to every authenticated role, filtered by date."""
+    init_db()
+    conn = get_db()
+    database_url, _ = get_db_config()
+    today = datetime.now(timezone.utc).date()
+    default_start = (today - timedelta(days=6)).isoformat()
+    default_end = today.isoformat()
+    start_value = request.args.get("start_date", default_start)
+    end_value = request.args.get("end_date", default_end)
+
+    try:
+        start_date = datetime.strptime(start_value, "%Y-%m-%d").date() if start_value else None
+        end_date = datetime.strptime(end_value, "%Y-%m-%d").date() if end_value else None
+    except ValueError:
+        abort(400, description="Tarix YYYY-MM-DD formatında olmalıdır.")
+    if start_date and end_date and start_date > end_date:
+        abort(400, description="Başlanğıc tarixi bitmə tarixindən sonra ola bilməz.")
+
+    placeholder = "%s" if database_url else "?"
+    date_expression = "s.created_at::date" if database_url else "DATE(s.created_at)"
+    date_conditions = []
+    parameters = []
+    if start_date:
+        date_conditions.append(f"{date_expression} >= {placeholder}")
+        parameters.append(start_date.isoformat())
+    if end_date:
+        date_conditions.append(f"{date_expression} <= {placeholder}")
+        parameters.append(end_date.isoformat())
+    where_clause = " AND ".join(["s.status = 'completed'", *date_conditions])
+
+    cur = conn.cursor()
+    try:
+        cur.execute(
+            f"""
+            SELECT s.created_at AS created_at,
+                   p.name AS product_name,
+                   si.quantity AS quantity,
+                   (si.unit_price * si.quantity) AS amount
+            FROM sale_items si
+            JOIN sales s ON si.sale_id = s.id
+            JOIN products p ON si.product_id = p.id
+            WHERE {where_clause}
+            ORDER BY s.created_at DESC, s.id DESC, si.id DESC
+            """,
+            tuple(parameters),
+        )
+        sales = cur.fetchall()
+    finally:
+        cur.close()
+
+    return render_template(
+        "sales_history.html",
+        sales=sales,
+        sales_count=len(sales),
+        start_date=start_value,
+        end_date=end_value,
+        default_start=default_start,
+        default_end=default_end,
     )
 
 
@@ -1784,8 +1804,8 @@ def _checkout_postgres(conn, cart):
     """Process checkout using a PostgreSQL connection.
 
     Validates cart items, creates a sales row, inserts sale_items and updates
-    product stock. Raises ValueError for client errors (bad payload or stock
-    shortage) so the caller can return 400.
+    product stock. Stock may go negative when the sold quantity exceeds the
+    recorded inventory.
     """
     cur = conn.cursor()
     try:
@@ -1804,9 +1824,6 @@ def _checkout_postgres(conn, cart):
             product = cur.fetchone()
             if product is None:
                 raise ValueError("Məhsul tapılmadı")
-            if quantity > product["stock"]:
-                raise ValueError(f"{product['name']} üçün kifayət qədər stok yoxdur.")
-
             line_total = float(product["price"]) * quantity
             total_amount += line_total
 
@@ -1858,9 +1875,6 @@ def _checkout_sqlite(conn, cart):
         product = conn.execute(select_sql, (product_id,)).fetchone()
         if product is None:
             raise ValueError("Məhsul tapılmadı")
-        if quantity > product["stock"]:
-            raise ValueError(f"{product['name']} üçün kifayət qədər stok yoxdur.")
-
         line_total = float(product["price"]) * quantity
         total_amount += line_total
 
@@ -2010,7 +2024,7 @@ def _row_value(row: object, key: str) -> Any:
 
 
 def _create_credit_order(conn, database_url, customer_name, cart):
-    """Create an open credit order, reserving stock for every cart item."""
+    """Create an open credit order and deduct sold quantities from stock."""
     total_amount = 0.0
     validated = []
     if database_url:
@@ -2028,8 +2042,6 @@ def _create_credit_order(conn, database_url, customer_name, cart):
                 product = cur.fetchone()
                 if product is None:
                     raise ValueError("Məhsul tapılmadı")
-                if quantity > product["stock"]:
-                    raise ValueError(f"{product['name']} üçün kifayət qədər stok yoxdur.")
                 validated.append((product_id, quantity, product["price"]))
                 total_amount += float(product["price"]) * quantity
 
@@ -2067,8 +2079,6 @@ def _create_credit_order(conn, database_url, customer_name, cart):
         ).fetchone()
         if product is None:
             raise ValueError("Məhsul tapılmadı")
-        if quantity > product["stock"]:
-            raise ValueError(f"{product['name']} üçün kifayət qədər stok yoxdur.")
         validated.append((product_id, quantity, product["price"]))
         total_amount += float(product["price"]) * quantity
 
@@ -2104,9 +2114,16 @@ def open_orders_page():
 
 @app.route("/tables")
 def tables_page():
-    """Render the six-table floor view."""
+    """Render the table floor view and management settings."""
     init_db()
-    return render_template("tables.html")
+    conn = get_db()
+    cur = conn.cursor()
+    try:
+        cur.execute("SELECT name FROM table_categories ORDER BY name")
+        table_categories = [_row_value(row, "name") for row in cur.fetchall()]
+    finally:
+        cur.close()
+    return render_template("tables.html", table_categories=table_categories)
 
 
 def _table_order_items(conn, database_url, order_id):
@@ -2261,8 +2278,6 @@ def add_table_items(table_number):
             product = cur.fetchone()
             if product is None:
                 raise ValueError("Məhsul tapılmadı.")
-            if quantity > _row_value(product, "stock"):
-                raise ValueError("Stokda kifayət qədər məhsul yoxdur.")
             cur.execute(
                 f"""
                 SELECT id, quantity FROM table_order_items
@@ -2627,10 +2642,6 @@ def add_credit_order_items(order_id):
                 product = cur.fetchone()
             if product is None:
                 raise ValueError("Məhsul tapılmadı")
-            if quantity > _row_value(product, "stock"):
-                raise ValueError(
-                    f"{_row_value(product, 'name')} üçün kifayət qədər stok yoxdur."
-                )
             unit_price = _row_value(product, "price")
             validated.append((product_id, quantity, unit_price))
             total += float(unit_price) * quantity

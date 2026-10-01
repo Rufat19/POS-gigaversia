@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Açıq qalanlar</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}?v=20260904-rb19">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}?v=20261001-nav-swap">
   </head>
   <body>
     <div class="page-header">
@@ -28,13 +28,12 @@
           {% if feature_enabled('products') %}<a href="/" class="nav-products">Məhsullar</a>{% endif %}
           {% if feature_enabled('tables') %}<a href="/tables" class="nav-tables">Masalar</a>{% endif %}
           <a href="/open-orders" class="active nav-open-orders">Açıq qalanlar</a>
-          {% if session.get('role') in ('manager', 'admin') %}
-            {% if feature_enabled('operations') %}
+          {% if session.get('role') in ('manager', 'admin') and feature_enabled('operations') %}
             <a href="/operations" class="nav-operations">Əməliyyatlar</a>
-            {% endif %}
-            {% if feature_enabled('reports') %}
+          {% endif %}
+          <a href="/sales-history" data-i18n="salesHistory">Satış tarixçəsi</a>
+          {% if session.get('role') in ('manager', 'admin') and feature_enabled('reports') %}
             <a href="/reports" class="nav-reports">Hesabatlar</a>
-            {% endif %}
           {% endif %}
           {% if session.get('role') == 'admin' %}<a href="/admin" class="nav-admin">Admin</a>{% endif %}
         </nav>
@@ -79,55 +78,59 @@
       const currentRole = '{{ "admin" if session.get("role") == "admin" else ("manager" if session.get("role") == "manager" else "seller") }}';
       const translations = {
         az: {
-          products: 'Məhsullar', openOrders: 'Açıq qalanlar', operations: 'Əməliyyatlar',
+          products: 'Məhsullar', openOrders: 'Açıq qalanlar', salesHistory: 'Satış tarixçəsi', operations: 'Əməliyyatlar',
           reports: 'Hesabatlar', tables: 'Masalar', admin: 'Admin', manager: 'Müdir', seller: 'Satıcı', administrator: 'Admin', logout: 'Çıxış',
           title: 'Açıq qalanlar', back: 'Məhsullara qayıt', history: 'Borc tarixçəsi',
           paid: 'Ödənilib', paidAmount: 'Ödənilən', total: 'Ümumi', remaining: 'Qalıq',
-          addProduct: 'Məhsul əlavə et', partialPayment: 'Hissəli ödəniş',
+          addProduct: 'Məhsul əlavə et', partialPayment: 'Hissəli ödəniş', fullPayment: 'Tam ödəniş',
           searchCustomer: 'Müştəri adına görə axtar...', all: 'Hamısı', open: 'Açıq',
           paidFilter: 'Ödənilmiş', newest: 'Yeni', oldest: 'Köhnə', amount: 'Məbləğ',
           name: 'Ad', groupByCustomer: 'Müştəriyə görə qruplaşdır',
           noOpen: 'Açıq sifariş yoxdur.', noHistory: 'Borc tarixçəsi boşdur.',
-          paymentPrompt: 'Ödənilən məbləği yazın (AZN):', invalidPayment: 'Düzgün ödəniş məbləği yazın.',
+          paymentPrompt: 'Ödənilən məbləği yazın (AZN):', fullPaymentConfirm: 'Borcun qalan {amount} AZN məbləği tam ödənilsin?',
+          invalidPayment: 'Düzgün ödəniş məbləği yazın.',
           paymentFailed: 'Ödəniş qeydə alınmadı.', loadFailed: 'Sifarişlər yüklənmədi.'
         },
         en: {
-          products: 'Products', openOrders: 'Open orders', operations: 'Operations',
+          products: 'Products', openOrders: 'Open orders', salesHistory: 'Sales history', operations: 'Operations',
           reports: 'Reports', tables: 'Tables', admin: 'Admin', manager: 'Manager', seller: 'Seller', administrator: 'Admin', logout: 'Logout',
           title: 'Open orders', back: 'Back to products', history: 'Credit history',
           paid: 'Paid', paidAmount: 'Paid', total: 'Total', remaining: 'Remaining',
-          addProduct: 'Add products', partialPayment: 'Partial payment',
+          addProduct: 'Add products', partialPayment: 'Partial payment', fullPayment: 'Pay in full',
           searchCustomer: 'Search by customer name...', all: 'All', open: 'Open',
           paidFilter: 'Paid', newest: 'Newest', oldest: 'Oldest', amount: 'Amount',
           name: 'Name', groupByCustomer: 'Group by customer',
           noOpen: 'No open orders.', noHistory: 'Credit history is empty.',
-          paymentPrompt: 'Enter payment amount (AZN):', invalidPayment: 'Enter a valid payment amount.',
+          paymentPrompt: 'Enter payment amount (AZN):', fullPaymentConfirm: 'Pay the remaining balance of {amount} AZN in full?',
+          invalidPayment: 'Enter a valid payment amount.',
           paymentFailed: 'Payment was not recorded.', loadFailed: 'Orders could not be loaded.'
         },
         ru: {
-          products: 'Товары', openOrders: 'Открытые заказы', operations: 'Операции',
+          products: 'Товары', openOrders: 'Открытые заказы', salesHistory: 'История продаж', operations: 'Операции',
           reports: 'Отчеты', tables: 'Столы', admin: 'Администратор', manager: 'Менеджер', seller: 'Продавец', administrator: 'Администратор', logout: 'Выход',
           title: 'Открытые заказы', back: 'К товарам', history: 'История долгов',
           paid: 'Оплачено', paidAmount: 'Оплачено', total: 'Всего', remaining: 'Остаток',
-          addProduct: 'Добавить товары', partialPayment: 'Частичная оплата',
+          addProduct: 'Добавить товары', partialPayment: 'Частичная оплата', fullPayment: 'Оплатить полностью',
           searchCustomer: 'Поиск по имени клиента...', all: 'Все', open: 'Открытые',
           paidFilter: 'Оплаченные', newest: 'Новые', oldest: 'Старые', amount: 'Сумма',
           name: 'Имя', groupByCustomer: 'Группировать по клиенту',
           noOpen: 'Нет открытых заказов.', noHistory: 'История долгов пуста.',
-          paymentPrompt: 'Введите сумму оплаты (AZN):', invalidPayment: 'Введите корректную сумму.',
+          paymentPrompt: 'Введите сумму оплаты (AZN):', fullPaymentConfirm: 'Полностью оплатить оставшуюся сумму {amount} AZN?',
+          invalidPayment: 'Введите корректную сумму.',
           paymentFailed: 'Платеж не записан.', loadFailed: 'Не удалось загрузить заказы.'
         },
         tr: {
-          products: 'Ürünler', openOrders: 'Açık siparişler', operations: 'İşlemler',
+          products: 'Ürünler', openOrders: 'Açık siparişler', salesHistory: 'Satış geçmişi', operations: 'İşlemler',
           reports: 'Raporlar', tables: 'Masalar', admin: 'Admin', manager: 'Yönetici', seller: 'Satıcı', administrator: 'Admin', logout: 'Çıkış',
           title: 'Açık siparişler', back: 'Ürünlere dön', history: 'Borç geçmişi',
           paid: 'Ödendi', paidAmount: 'Ödenen', total: 'Toplam', remaining: 'Kalan',
-          addProduct: 'Ürün ekle', partialPayment: 'Kısmi ödeme',
+          addProduct: 'Ürün ekle', partialPayment: 'Kısmi ödeme', fullPayment: 'Tam ödeme',
           searchCustomer: 'Müşteri adına göre ara...', all: 'Tümü', open: 'Açık',
           paidFilter: 'Ödenmiş', newest: 'Yeni', oldest: 'Eski', amount: 'Tutar',
           name: 'Ad', groupByCustomer: 'Müşteriye göre grupla',
           noOpen: 'Açık sipariş yok.', noHistory: 'Borç geçmişi boş.',
-          paymentPrompt: 'Ödeme tutarını yazın (AZN):', invalidPayment: 'Geçerli bir ödeme tutarı yazın.',
+          paymentPrompt: 'Ödeme tutarını yazın (AZN):', fullPaymentConfirm: 'Kalan {amount} AZN borç tamamen ödensin mi?',
+          invalidPayment: 'Geçerli bir ödeme tutarı yazın.',
           paymentFailed: 'Ödeme kaydedilmedi.', loadFailed: 'Siparişler yüklenemedi.'
         }
       };
@@ -171,7 +174,7 @@
         const items=order.items.map(item=>`<li>${item.name} × ${item.quantity}<strong>${item.line_total.toFixed(2)} AZN</strong></li>`).join('');
         const action=isPaid
           ? `<span class="paid-badge">${t('paid')} · ${order.total_amount.toFixed(2)} AZN</span>`
-          : `<div class="credit-order-actions"><a class="btn primary" href="/?credit_order=${order.id}">${t('addProduct')}</a><button class="btn pay-btn" onclick="payOrder(${order.id})">${t('partialPayment')}</button></div>`;
+          : `<div class="credit-order-actions"><a class="btn primary" href="/?credit_order=${order.id}">${t('addProduct')}</a><button class="btn pay-btn" onclick="payOrder(${order.id})">${t('partialPayment')}</button><button class="btn pay-btn" onclick="payOrder(${order.id}, ${order.remaining_amount})">${t('fullPayment')}</button></div>`;
         const paymentInfo=isPaid
           ? `<div class="payment-info">${t('paidAmount')}: ${order.paid_amount.toFixed(2)} AZN</div>`
           : `<div class="payment-info">${t('total')}: ${order.total_amount.toFixed(2)} AZN · ${t('paidAmount')}: ${order.paid_amount.toFixed(2)} AZN · ${t('remaining')}: <strong>${order.remaining_amount.toFixed(2)} AZN</strong></div>`;
@@ -213,10 +216,16 @@
         allOrders = result.orders;
         renderOrderLists();
       }
-      async function payOrder(orderId){
-        const amount=window.prompt(t('paymentPrompt'));
-        if(amount===null) return;
-        const parsed=Number(amount.replace(',', '.'));
+      async function payOrder(orderId, fullAmount=null){
+        let parsed=fullAmount;
+        if(parsed!==null){
+          const confirmMessage=t('fullPaymentConfirm').replace('{amount}', parsed.toFixed(2));
+          if(!window.confirm(confirmMessage)) return;
+        }else{
+          const amount=window.prompt(t('paymentPrompt'));
+          if(amount===null) return;
+          parsed=Number(amount.replace(',', '.'));
+        }
         if(!Number.isFinite(parsed) || parsed<=0){ alert(t('invalidPayment')); return; }
         const response=await fetch(`/api/credit-orders/${orderId}/pay`,{
           method:'POST',

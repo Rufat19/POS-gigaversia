@@ -16,7 +16,8 @@ Kiçik biznes üçün hazırlanmış, toxunma-dostu (touch-friendly) satış nö
 - Kateqoriya üzrə məhsul seçimi (Drinks, Fastfood, Other, Protein, Salads, Snacks)
 - Toxunma-dostu interfeys, miqdar seçimi ilə səbətə əlavə etmə
 - Səbətdə real-vaxt cəm hesablama
-- Satışı təsdiqləmə - stok avtomatik azalır
+- Satışı təsdiqləmə - stok avtomatik azalır, qalıq kifayət etmədikdə satış mənfi stokla da davam edir
+- Satışdan sonra 80 mm termal qəbz çap pəncərəsi açılır; qəbz Xprinter üçün formatlanır
 - Azərbaycan, İngilis, Rus və Türk dilləri arasında keçid
 
 ### 2. Açıq qalanlar / Nisyə sifarişlər
@@ -25,25 +26,36 @@ Kiçik biznes üçün hazırlanmış, toxunma-dostu (touch-friendly) satış nö
 - Açıq sifariş bağlananda onu ödənilmiş borc tarixçəsində saxlamaq
 - Açıq nisyə sifariş yaradılarkən və yenilənərkən stokun avtomatik azaldılması
 
-### 3. Əməliyyatlar (Transactions)
-- Bütün satışlar, daxilolmalar (məhsul girişi) və itkilər (zay/xarab olma) bir tarixçədə
-- Daxilolma qeyd ediləndə əlaqəli məhsulun stoku artır
-- İtki qeyd ediləndə stok azalır, mövcud stokdan çox miqdara icazə verilmir
+### 3. Masalar
+- Masalar kateqoriyaya görə avtomatik qruplaşdırılır; boş/dolu vəziyyətinə görə filtrləmək, ad və nömrəyə görə sıralamaq mümkündür
+- Müdir və admin üçün masa/kateqoriya tənzimləmələri Masalar bölməsindəki Tənzimləmələr düyməsindədir
 
-### 4. Hesabatlar
+### 4. Əməliyyatlar (Transactions)
+- Məhsul daxilolmaları və itkilər üçün anbar hərəkətləri tarixçəsi
+- Daxilolma qeyd ediləndə əlaqəli məhsulun stoku artır
+- İtki qeyd ediləndə stok azalır, mövcud stokdan çox itkiyə icazə verilmir
+- Satış zamanı stok miqdarı satışa mane olmur və qalıq mənfiyə düşə bilər
+
+### 5. Satış tarixçəsi
+- Satış sətirləri ayrıca bölmədə göstərilir
+- Satıcı, müdir və admin üçün daim açıqdır
+- Başlanğıc və bitmə tarixi seçərək satışları filtrləmək mümkündür
+
+### 6. Hesabatlar
 - Tarix aralığı seçimi ilə filtrlənən analitika
 - Ən çox / ən az satılan məhsullar
 - Kateqoriya üzrə satış payı (pie chart)
 - Gün üzrə satış məbləği (bar chart)
 - Top 5 məhsul (bar chart)
 
-### 5. Rol-əsaslı giriş sistemi
-4 rəqəmli PIN kodları ilə iki səlahiyyət səviyyəsi:
+### 7. Rol-əsaslı giriş sistemi
+4 rəqəmli PIN kodları ilə üç rol:
 
 | Rol | Giriş imkanları |
 |---|---|
-| Satıcı | Yalnız POS/Kiosk |
-| Müdir | POS + Məhsul əlavə etmə + Əməliyyatlar + Hesabatlar |
+| Satıcı | POS/Kiosk + Satış tarixçəsi |
+| Müdir | POS + Məhsul əlavə etmə + Əməliyyatlar + Satış tarixçəsi + Hesabatlar |
+| Admin | Bütün bölmələr + İdarəetmə |
 
 PIN-lər production mühitində yalnız Railway Variables bölməsindən verilməlidir.
 PIN-lər artıq `.env` dəyişənlərindən oxunur:
@@ -79,6 +91,11 @@ python app.py
 ```
 
 Brauzerdə aç: `http://127.0.0.1:5000`
+
+Qəbz çapı zamanı printer parametrlərində 80 mm rulon ölçüsünü seçin, kənar boşluqları
+minimuma endirin və brauzerin çap dialoqunda Xprinter-i göstərin. Adi brauzer rejimində
+istifadəçi çapı təsdiqləyir; təsdiqsiz çap üçün POS kompüterində ayrıca kiosk və ya lokal
+çap köməkçisi konfiqurasiyası tələb olunur.
 
 ## Deploy (Railway)
 

@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>POS - Məhsul siyahısı</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}?v=20260904-rb19">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}?v=20261001-nav-swap">
 
   </head>
   <body>
@@ -31,13 +31,12 @@
           {% endif %}
           {% if feature_enabled('tables') %}<a href="/tables" data-i18n="nav.tables">Masalar</a>{% endif %}
           {% if feature_enabled('open_orders') %}<a href="/open-orders" data-i18n="nav.openOrders">Açıq qalanlar</a>{% endif %}
-          {% if session.get('role') in ('manager', 'admin') %}
-            {% if feature_enabled('operations') %}
+          {% if session.get('role') in ('manager', 'admin') and feature_enabled('operations') %}
             <a href="/operations" data-i18n="nav.operations">Əməliyyatlar</a>
-            {% endif %}
-            {% if feature_enabled('reports') %}
+          {% endif %}
+          <a href="/sales-history" data-i18n="nav.salesHistory">Satış tarixçəsi</a>
+          {% if session.get('role') in ('manager', 'admin') and feature_enabled('reports') %}
             <a href="/reports" data-i18n="nav.reports">Hesabatlar</a>
-            {% endif %}
           {% endif %}
           {% if session.get('role') == 'admin' %}<a href="/admin" data-i18n="nav.admin">Admin</a>{% endif %}
         </nav>
@@ -121,6 +120,7 @@
           'nav.tables': 'Masalar',
           'nav.admin': 'Admin',
           'nav.openOrders': 'Açıq qalanlar',
+          'nav.salesHistory': 'Satış tarixçəsi',
           'nav.operations': 'Əməliyyatlar',
           'nav.reports': 'Hesabatlar',
           'role.seller': 'Satıcı',
@@ -142,7 +142,6 @@
           'credit.customerPrompt': 'Müştərinin adını yazın:',
           'credit.saved': 'Açıq sifariş saxlanıldı.',
           'alert.minQty': 'Miqdar 1-dən az ola bilməz.',
-          'alert.stock': 'Seçilən miqdar mövcud stokdan çoxdur.',
           'alert.emptyCart': 'Səbət boşdur.',
           'checkout.processing': 'Satış yazılır...',
           'checkout.success': 'Satış tamamlandı!',
@@ -153,6 +152,7 @@
           'nav.tables': 'Tables',
           'nav.admin': 'Admin',
           'nav.openOrders': 'Open orders',
+          'nav.salesHistory': 'Sales history',
           'nav.operations': 'Operations',
           'nav.reports': 'Reports',
           'role.seller': 'Seller',
@@ -174,7 +174,6 @@
           'credit.customerPrompt': 'Enter the customer name:',
           'credit.saved': 'Open order saved.',
           'alert.minQty': 'Quantity cannot be less than 1.',
-          'alert.stock': 'Selected quantity exceeds available stock.',
           'alert.emptyCart': 'Cart is empty.',
           'checkout.processing': 'Processing sale...',
           'checkout.success': 'Sale completed!',
@@ -185,6 +184,7 @@
           'nav.tables': 'Столы',
           'nav.admin': 'Администратор',
           'nav.openOrders': 'Открытые заказы',
+          'nav.salesHistory': 'История продаж',
           'nav.operations': 'Операции',
           'nav.reports': 'Отчеты',
           'role.seller': 'Продавец',
@@ -206,7 +206,6 @@
           'credit.customerPrompt': 'Введите имя клиента:',
           'credit.saved': 'Открытый заказ сохранен.',
           'alert.minQty': 'Количество не может быть меньше 1.',
-          'alert.stock': 'Выбранное количество превышает доступный остаток.',
           'alert.emptyCart': 'Корзина пуста.',
           'checkout.processing': 'Обработка продажи...',
           'checkout.success': 'Продажа завершена!',
@@ -217,6 +216,7 @@
           'nav.tables': 'Masalar',
           'nav.admin': 'Admin',
           'nav.openOrders': 'Açık siparişler',
+          'nav.salesHistory': 'Satış geçmişi',
           'nav.operations': 'İşlemler',
           'nav.reports': 'Raporlar',
           'role.seller': 'Satıcı',
@@ -238,7 +238,6 @@
           'credit.customerPrompt': 'Müşteri adını yazın:',
           'credit.saved': 'Açık sipariş kaydedildi.',
           'alert.minQty': 'Miktar 1\'den küçük olamaz.',
-          'alert.stock': 'Seçilen miktar mevcut stoktan fazladır.',
           'alert.emptyCart': 'Sepet boş.',
           'checkout.processing': 'Satış işleniyor...',
           'checkout.success': 'Satış tamamlandı!',
@@ -321,11 +320,7 @@
 
        if (quantity < 1) { alert(translations[currentLang]['alert.minQty']); return; }
 
-        const stockEl = document.getElementById('stock-' + id);
-        const available = stockEl ? Number(stockEl.textContent || 0) : null;
         const existing = cart.find(item => item.id === id);
-        const alreadyInCart = existing ? existing.quantity : 0;
-       if (available !== null && (quantity + alreadyInCart) > available) { alert(translations[currentLang]['alert.stock']); return; }
  
        if (existing) existing.quantity += quantity; else cart.push({ id, name, price, quantity });
        renderCart();
@@ -368,15 +363,28 @@
 
       async function checkout(){
        if(cart.length===0){ alert(translations[currentLang]['alert.emptyCart']); return; }
+       const receiptWindow=window.open('','_blank','width=420,height=760');
        const messageBox=document.getElementById('checkout-message'); messageBox.textContent=translations[currentLang]['checkout.processing'];
        try{
          const response = await fetch('/checkout',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({cart})});
          const result = await response.json(); if(!response.ok) throw new Error(result.message||translations[currentLang]['checkout.defaultError']);
          messageBox.textContent = result.message || translations[currentLang]['checkout.success'];
-          cart.forEach(item=>{ const stockEl=document.getElementById('stock-'+item.id); if(stockEl){ const current=Number(stockEl.textContent||0); stockEl.textContent=Math.max(0,current-item.quantity); } });
-         try{ printReceipt(result, cart); }catch(e){ console.error('Print error',e); }
+          cart.forEach(item=>{ const stockEl=document.getElementById('stock-'+item.id); if(stockEl){ const current=Number(stockEl.textContent||0); stockEl.textContent=current-item.quantity; } });
+         if(receiptWindow){
+           try{ printReceipt(result, cart, receiptWindow); }
+           catch(e){
+             console.error('Print error',e);
+             messageBox.textContent='Satış qeydə alındı, lakin qəbz açıla bilmədi.';
+             receiptWindow.close();
+           }
+         }else{
+           messageBox.textContent='Satış qeydə alındı, lakin brauzer qəbz pəncərəsini blokladı. Popup icazəsini aktiv edin.';
+         }
          cart.length=0; renderCart();
-       }catch(err){ messageBox.textContent=err.message; }
+       }catch(err){
+         if(receiptWindow && !receiptWindow.closed) receiptWindow.close();
+         messageBox.textContent=err.message;
+       }
       }
 
       async function saveAsOpenOrder(){
@@ -404,7 +412,7 @@
            const stockEl=document.getElementById('stock-'+item.id);
            if(stockEl){
              const current=Number(stockEl.textContent||0);
-             stockEl.textContent=Math.max(0,current-item.quantity);
+             stockEl.textContent=current-item.quantity;
            }
          });
          cart.length=0;
@@ -426,34 +434,64 @@
          messageBox.textContent=result.message || translations[currentLang]['credit.saved'];
          cart.forEach(item=>{
            const stockEl=document.getElementById('stock-'+item.id);
-           if(stockEl) stockEl.textContent=Math.max(0,Number(stockEl.textContent||0)-item.quantity);
+           if(stockEl) stockEl.textContent=Number(stockEl.textContent||0)-item.quantity;
          });
          cart.length=0;
          renderCart();
        }catch(err){ messageBox.textContent=err.message; }
       }
 
-      // print receipt helper
-      function printReceipt(result, cartSnapshot){
-        const w = window.open('','_blank','width=600,height=800');
-        const total = result.total || 0;
-        const saleId = result.sale_id || '';
-        const now = new Date().toLocaleString();
-        const itemsHtml = cartSnapshot.map(i=>`<tr><td>${i.name}</td><td style="text-align:right">${i.quantity}</td><td style="text-align:right">${i.price.toFixed(2)}</td><td style="text-align:right">${(i.price*i.quantity).toFixed(2)}</td></tr>`).join('');
+      function printReceipt(result, cartSnapshot, w){
+        const escapeHtml=value=>String(value).replace(/[&<>"']/g,character=>({
+          '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
+        })[character]);
+        const total = Number(result.total || 0);
+        const saleId = escapeHtml(result.sale_id || '');
+        const now = new Intl.DateTimeFormat('az-AZ',{dateStyle:'short',timeStyle:'short'}).format(new Date());
+        const itemsHtml = cartSnapshot.map(item=>`
+          <article class="receipt-item">
+            <div class="item-name">${escapeHtml(item.name)}</div>
+            <div class="item-details">
+              <span>${Number(item.quantity)} × ${Number(item.price).toFixed(2)} AZN</span>
+              <strong>${(Number(item.price)*Number(item.quantity)).toFixed(2)} AZN</strong>
+            </div>
+          </article>
+        `).join('');
         const html = `
-          <html><head><title>Qəbz</title>
-          <style>body{font-family:Arial,Helvetica,sans-serif;padding:20px}table{width:100%;border-collapse:collapse}td,th{padding:6px;border-bottom:1px solid #ddd}</style>
-          </head><body>
-          <h2>Satış Qəbzi</h2>
-          <div>Satış nömrəsi: ${saleId}</div>
-          <div>Zaman: ${now}</div>
-          <table>
-            <thead><tr><th>Məhsul</th><th style="text-align:right">Miqdar</th><th style="text-align:right">Vahid</th><th style="text-align:right">Cəmi</th></tr></thead>
-            <tbody>${itemsHtml}</tbody>
-          </table>
-          <h3>Ümumi: ${Number(total).toFixed(2)} AZN</h3>
-          <div style="margin-top:20px">Təşəkkür edirik!</div>
-          <script>setTimeout(function(){ window.print(); }, 300);<\/script>
+          <!doctype html>
+          <html lang="az"><head><meta charset="utf-8"><title>Satış qəbzi</title>
+          <style>
+            @page{size:80mm auto;margin:0}
+            *{box-sizing:border-box}
+            html,body{width:80mm;margin:0;padding:0;background:#fff;color:#111}
+            body{font-family:Arial,Helvetica,sans-serif;font-size:12px;line-height:1.4}
+            .receipt{width:80mm;padding:4mm 4mm 5mm;margin:0 auto}
+            .brand{text-align:center;padding-bottom:10px;border-bottom:1px dashed #555}
+            .brand-name{font-size:24px;font-weight:900;letter-spacing:1px}
+            .brand-subtitle{margin-top:2px;font-size:10px;color:#444}
+            .receipt-title{margin:12px 0 8px;text-align:center;font-size:15px;font-weight:800}
+            .meta{display:flex;justify-content:space-between;gap:8px;margin:3px 0;font-size:10px}
+            .items{margin-top:12px;border-top:1px dashed #555}
+            .receipt-item{padding:8px 0;border-bottom:1px dashed #aaa;break-inside:avoid}
+            .item-name{font-weight:700;overflow-wrap:anywhere}
+            .item-details{display:flex;justify-content:space-between;gap:8px;margin-top:3px;font-size:11px}
+            .item-details strong{white-space:nowrap}
+            .total{display:flex;justify-content:space-between;gap:8px;padding:12px 0 10px;font-size:16px;font-weight:800}
+            .footer{padding-top:9px;border-top:1px dashed #555;text-align:center;font-size:11px}
+            @media screen{body{background:#e5e7eb}.receipt{min-height:100vh;background:#fff;box-shadow:0 2px 16px #0002}}
+          </style></head><body>
+          <main class="receipt">
+            <header class="brand">
+              <div class="brand-name">RB19</div>
+              <div class="brand-subtitle">Satış qəbzi</div>
+            </header>
+            <div class="meta"><span>Satış №</span><strong>${saleId}</strong></div>
+            <div class="meta"><span>Tarix</span><span>${escapeHtml(now)}</span></div>
+            <section class="items" aria-label="Satılan məhsullar">${itemsHtml}</section>
+            <div class="total"><span>YEKUN</span><span>${total.toFixed(2)} AZN</span></div>
+            <footer class="footer">Təşəkkür edirik!<br>Yenidən gözləyirik.</footer>
+          </main>
+          <script>window.addEventListener('load',function(){window.focus();setTimeout(function(){window.print();},500);});<\/script>
           </body></html>
         `;
         w.document.write(html);

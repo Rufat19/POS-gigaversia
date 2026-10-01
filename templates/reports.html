@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Hesabatlar</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}?v=20260904-rb19">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}?v=20261001-nav-swap">
     <!-- Chart.js CDN -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   </head>
@@ -30,12 +30,13 @@
           {% if feature_enabled('products') %}<a href="/" data-i18n="nav.products">Məhsullar</a>{% endif %}
           {% if feature_enabled('tables') %}<a href="/tables" data-i18n="nav.tables">Masalar</a>{% endif %}
           {% if feature_enabled('open_orders') %}<a href="/open-orders" data-i18n="nav.openOrders">Açıq qalanlar</a>{% endif %}
-          {% if feature_enabled('operations') %}<a href="/operations" data-i18n="nav.operations">Əməliyyatlar</a>{% endif %}
+          {% if session.get('role') in ('manager', 'admin') and feature_enabled('operations') %}<a href="/operations" data-i18n="nav.operations">Əməliyyatlar</a>{% endif %}
+          <a href="/sales-history" data-i18n="nav.salesHistory">Satış tarixçəsi</a>
           <a href="/reports" class="active" data-i18n="nav.reports">Hesabatlar</a>
           {% if session.get('role') == 'admin' %}<a href="/admin" data-i18n="nav.admin">Admin</a>{% endif %}
         </nav>
         <div class="user-chip">
-          <span id="role-label" data-i18n="role.manager">{{ 'Admin' if session.get('role') == 'admin' else 'Müdir' }}</span>
+          <span id="role-label">{{ 'Admin' if session.get('role') == 'admin' else 'Müdir' }}</span>
           <a href="{{ url_for('logout') }}" class="logout-link" data-i18n="common.logout">Çıxış</a>
         </div>
       </div>
@@ -88,6 +89,7 @@
           'nav.tables': 'Masalar',
           'nav.admin': 'Admin',
           'nav.openOrders': 'Açıq qalanlar',
+          'nav.salesHistory': 'Satış tarixçəsi',
           'nav.operations': 'Əməliyyatlar',
           'nav.reports': 'Hesabatlar',
           'role.manager': 'Müdir',
@@ -111,6 +113,7 @@
           'nav.tables': 'Tables',
           'nav.admin': 'Admin',
           'nav.openOrders': 'Open orders',
+          'nav.salesHistory': 'Sales history',
           'nav.operations': 'Operations',
           'nav.reports': 'Reports',
           'role.manager': 'Manager',
@@ -134,6 +137,7 @@
           'nav.tables': 'Столы',
           'nav.admin': 'Администратор',
           'nav.openOrders': 'Открытые заказы',
+          'nav.salesHistory': 'История продаж',
           'nav.operations': 'Операции',
           'nav.reports': 'Отчеты',
           'role.manager': 'Менеджер',
@@ -157,6 +161,7 @@
           'nav.tables': 'Masalar',
           'nav.admin': 'Admin',
           'nav.openOrders': 'Açık siparişler',
+          'nav.salesHistory': 'Satış geçmişi',
           'nav.operations': 'İşlemler',
           'nav.reports': 'Raporlar',
           'role.manager': 'Yönetici',

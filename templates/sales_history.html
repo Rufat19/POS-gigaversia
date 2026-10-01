@@ -1,0 +1,194 @@
+<!doctype html>
+<html lang="az">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Satış tarixçəsi</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}?v=20261001-nav-swap">
+  </head>
+  <body>
+    <div class="page-header">
+      <div class="page-title">
+        <h1 data-i18n="sales.title">Satış tarixçəsi</h1>
+        <p class="page-subtitle" data-i18n="sales.subtitle">Satışları tarix aralığına görə nəzərdən keçirin</p>
+      </div>
+      <div class="page-actions">
+        <div class="lang-switcher" aria-label="Dil seçimi">
+          <label class="lang-select-wrap" for="sales-history-lang-select">
+            <span class="sr-only">Dil</span>
+            <select id="sales-history-lang-select" class="lang-select" aria-label="Dil seçimi">
+              <option value="az">Aze</option>
+              <option value="en">Eng</option>
+              <option value="ru">Rus</option>
+              <option value="tr">Tur</option>
+            </select>
+          </label>
+        </div>
+        <nav class="page-nav">
+          {% if feature_enabled('products') %}<a href="/" data-i18n="nav.products">Məhsullar</a>{% endif %}
+          {% if feature_enabled('tables') %}<a href="/tables" data-i18n="nav.tables">Masalar</a>{% endif %}
+          {% if feature_enabled('open_orders') %}<a href="/open-orders" data-i18n="nav.openOrders">Açıq qalanlar</a>{% endif %}
+          {% if session.get('role') in ('manager', 'admin') and feature_enabled('operations') %}<a href="/operations" data-i18n="nav.operations">Əməliyyatlar</a>{% endif %}
+          <a href="/sales-history" class="active" data-i18n="nav.salesHistory">Satış tarixçəsi</a>
+          {% if feature_enabled('reports') %}<a href="/reports" data-i18n="nav.reports">Hesabatlar</a>{% endif %}
+          {% if session.get('role') == 'admin' %}<a href="/admin" data-i18n="nav.admin">Admin</a>{% endif %}
+        </nav>
+        <div class="user-chip">
+          <span data-i18n="role.{{ session.get('role') }}">{{ 'Admin' if session.get('role') == 'admin' else ('Müdir' if session.get('role') == 'manager' else 'Satıcı') }}</span>
+          <a href="{{ url_for('logout') }}" class="logout-link" data-i18n="common.logout">Çıxış</a>
+        </div>
+      </div>
+    </div>
+
+    <main class="container">
+      <section class="card history-card">
+        <div class="history-header-row">
+          <h3 data-i18n="sales.listTitle">Satışlar</h3>
+          <div class="history-meta">
+            <span>{{ sales_count }}</span>
+            <span data-i18n="sales.count">sətir</span>
+          </div>
+        </div>
+
+        <div class="history-presets" aria-label="Tarix aralığı qısa seçimləri">
+          <button class="preset-btn" type="button" data-range="7" data-i18n="sales.last7">Son 7 gün</button>
+          <button class="preset-btn" type="button" data-range="30" data-i18n="sales.last30">Son 30 gün</button>
+          <button class="preset-btn" type="button" data-range="month" data-i18n="sales.thisMonth">Bu ay</button>
+          <button class="preset-btn" type="button" data-range="all" data-i18n="sales.allDates">Bütün tarixlər</button>
+        </div>
+
+        <form id="sales-date-filter" class="history-filters sales-history-filters" method="get" action="/sales-history">
+          <label class="date-filter">
+            <span data-i18n="sales.startDate">Başlanğıc tarix</span>
+            <input id="sales-start-date" name="start_date" type="date" value="{{ start_date }}">
+          </label>
+          <label class="date-filter">
+            <span data-i18n="sales.endDate">Bitmə tarixi</span>
+            <input id="sales-end-date" name="end_date" type="date" value="{{ end_date }}">
+          </label>
+          <button class="btn primary" type="submit" data-i18n="sales.filter">Filtrlə</button>
+        </form>
+
+        <div class="table-wrap history-scroll">
+          <table class="history-table">
+            <thead>
+              <tr>
+                <th data-i18n="sales.dateColumn">Tarix</th>
+                <th data-i18n="sales.productColumn">Məhsul</th>
+                <th class="text-right" data-i18n="sales.quantityColumn">Miqdar</th>
+                <th class="text-right" data-i18n="sales.amountColumn">Məbləğ</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for sale in sales %}
+                <tr>
+                  <td>{{ sale.created_at }}</td>
+                  <td>{{ sale.product_name }}</td>
+                  <td class="text-right">{{ sale.quantity }}</td>
+                  <td class="text-right">{{ "%.2f"|format(sale.amount) }} AZN</td>
+                </tr>
+              {% else %}
+                <tr><td colspan="4" data-i18n="sales.empty">Bu tarix aralığında satış yoxdur.</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </main>
+
+    <script>
+      const translations = {
+        az: {
+          'nav.products': 'Məhsullar', 'nav.tables': 'Masalar', 'nav.openOrders': 'Açıq qalanlar',
+          'nav.operations': 'Əməliyyatlar', 'nav.salesHistory': 'Satış tarixçəsi',
+          'nav.reports': 'Hesabatlar', 'nav.admin': 'Admin',
+          'role.seller': 'Satıcı', 'role.manager': 'Müdir', 'role.admin': 'Admin', 'common.logout': 'Çıxış',
+          'sales.title': 'Satış tarixçəsi', 'sales.subtitle': 'Satışları tarix aralığına görə nəzərdən keçirin',
+          'sales.listTitle': 'Satışlar', 'sales.count': 'sətir', 'sales.last7': 'Son 7 gün',
+          'sales.last30': 'Son 30 gün', 'sales.thisMonth': 'Bu ay', 'sales.allDates': 'Bütün tarixlər',
+          'sales.startDate': 'Başlanğıc tarix', 'sales.endDate': 'Bitmə tarixi', 'sales.filter': 'Filtrlə',
+          'sales.dateColumn': 'Tarix', 'sales.productColumn': 'Məhsul', 'sales.quantityColumn': 'Miqdar',
+          'sales.amountColumn': 'Məbləğ', 'sales.empty': 'Bu tarix aralığında satış yoxdur.'
+        },
+        en: {
+          'nav.products': 'Products', 'nav.tables': 'Tables', 'nav.openOrders': 'Open orders',
+          'nav.operations': 'Operations', 'nav.salesHistory': 'Sales history',
+          'nav.reports': 'Reports', 'nav.admin': 'Admin',
+          'role.seller': 'Seller', 'role.manager': 'Manager', 'role.admin': 'Admin', 'common.logout': 'Logout',
+          'sales.title': 'Sales history', 'sales.subtitle': 'Review sales by date range',
+          'sales.listTitle': 'Sales', 'sales.count': 'items', 'sales.last7': 'Last 7 days',
+          'sales.last30': 'Last 30 days', 'sales.thisMonth': 'This month', 'sales.allDates': 'All dates',
+          'sales.startDate': 'Start date', 'sales.endDate': 'End date', 'sales.filter': 'Filter',
+          'sales.dateColumn': 'Date', 'sales.productColumn': 'Product', 'sales.quantityColumn': 'Quantity',
+          'sales.amountColumn': 'Amount', 'sales.empty': 'No sales in this date range.'
+        },
+        ru: {
+          'nav.products': 'Товары', 'nav.tables': 'Столы', 'nav.openOrders': 'Открытые заказы',
+          'nav.operations': 'Операции', 'nav.salesHistory': 'История продаж',
+          'nav.reports': 'Отчеты', 'nav.admin': 'Администратор',
+          'role.seller': 'Продавец', 'role.manager': 'Менеджер', 'role.admin': 'Администратор', 'common.logout': 'Выход',
+          'sales.title': 'История продаж', 'sales.subtitle': 'Просмотр продаж за выбранный период',
+          'sales.listTitle': 'Продажи', 'sales.count': 'позиций', 'sales.last7': 'Последние 7 дней',
+          'sales.last30': 'Последние 30 дней', 'sales.thisMonth': 'Этот месяц', 'sales.allDates': 'За всё время',
+          'sales.startDate': 'Дата начала', 'sales.endDate': 'Дата окончания', 'sales.filter': 'Фильтр',
+          'sales.dateColumn': 'Дата', 'sales.productColumn': 'Товар', 'sales.quantityColumn': 'Количество',
+          'sales.amountColumn': 'Сумма', 'sales.empty': 'За этот период продаж нет.'
+        },
+        tr: {
+          'nav.products': 'Ürünler', 'nav.tables': 'Masalar', 'nav.openOrders': 'Açık siparişler',
+          'nav.operations': 'İşlemler', 'nav.salesHistory': 'Satış geçmişi',
+          'nav.reports': 'Raporlar', 'nav.admin': 'Admin',
+          'role.seller': 'Satıcı', 'role.manager': 'Yönetici', 'role.admin': 'Admin', 'common.logout': 'Çıkış',
+          'sales.title': 'Satış geçmişi', 'sales.subtitle': 'Satışları tarih aralığına göre görüntüleyin',
+          'sales.listTitle': 'Satışlar', 'sales.count': 'kalem', 'sales.last7': 'Son 7 gün',
+          'sales.last30': 'Son 30 gün', 'sales.thisMonth': 'Bu ay', 'sales.allDates': 'Tüm tarihler',
+          'sales.startDate': 'Başlangıç tarihi', 'sales.endDate': 'Bitiş tarihi', 'sales.filter': 'Filtrele',
+          'sales.dateColumn': 'Tarih', 'sales.productColumn': 'Ürün', 'sales.quantityColumn': 'Miktar',
+          'sales.amountColumn': 'Tutar', 'sales.empty': 'Bu tarih aralığında satış yok.'
+        }
+      };
+
+      const langSelect = document.getElementById('sales-history-lang-select');
+      function applyLanguage(lang) {
+        const selected = translations[lang] ? lang : 'az';
+        const dictionary = translations[selected];
+        document.documentElement.lang = selected;
+        document.querySelectorAll('[data-i18n]').forEach((element) => {
+          element.textContent = dictionary[element.dataset.i18n] || element.textContent;
+        });
+        langSelect.value = selected;
+        localStorage.setItem('pos_lang', selected);
+      }
+
+      langSelect.addEventListener('change', () => applyLanguage(langSelect.value));
+      document.querySelectorAll('[data-range]').forEach((button) => {
+        button.addEventListener('click', () => {
+          const startInput = document.getElementById('sales-start-date');
+          const endInput = document.getElementById('sales-end-date');
+          const range = button.dataset.range;
+          if (range === 'all') {
+            startInput.value = '';
+            endInput.value = '';
+          } else {
+            const end = new Date();
+            const start = new Date();
+            if (range === 'month') {
+              start.setDate(1);
+            } else {
+              start.setDate(end.getDate() - (Number(range) - 1));
+            }
+            const toDateInputValue = (date) => {
+              const localDate = new Date(date.getTime() - date.getTimezoneOffset() * 60000);
+              return localDate.toISOString().slice(0, 10);
+            };
+            startInput.value = toDateInputValue(start);
+            endInput.value = toDateInputValue(end);
+          }
+          document.getElementById('sales-date-filter').requestSubmit();
+        });
+      });
+
+      applyLanguage(localStorage.getItem('pos_lang') || 'az');
+    </script>
+  </body>
+</html>
