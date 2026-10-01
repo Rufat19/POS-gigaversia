@@ -11,7 +11,7 @@
       <div class="page-title brand-header">
         {% include '_brand_lockup.html' %}
         <h1 class="page-section-title" data-i18n="nav.openOrders">Açıq qalanlar</h1>
-        <p class="page-description">Açıq sifarişlər və borc tarixçəsi</p>
+        <p class="page-description" data-i18n="description">Açıq sifarişlər və borc tarixçəsi</p>
       </div>
       <div class="page-actions">
         <div class="lang-switcher" aria-label="Dil seçimi">
@@ -80,7 +80,7 @@
         az: {
           products: 'Məhsullar', openOrders: 'Açıq qalanlar', salesHistory: 'Satış tarixçəsi', operations: 'Əməliyyatlar',
           reports: 'Hesabatlar', tables: 'Masalar', admin: 'Admin', manager: 'Müdir', seller: 'Satıcı', administrator: 'Admin', logout: 'Çıxış',
-          title: 'Açıq qalanlar', back: 'Məhsullara qayıt', history: 'Borc tarixçəsi',
+          title: 'Açıq qalanlar', description: 'Açıq sifarişlər və borc tarixçəsi', back: 'Məhsullara qayıt', history: 'Borc tarixçəsi',
           paid: 'Ödənilib', paidAmount: 'Ödənilən', total: 'Ümumi', remaining: 'Qalıq',
           addProduct: 'Məhsul əlavə et', partialPayment: 'Hissəli ödəniş', fullPayment: 'Tam ödəniş',
           searchCustomer: 'Müştəri adına görə axtar...', all: 'Hamısı', open: 'Açıq',
@@ -94,7 +94,7 @@
         en: {
           products: 'Products', openOrders: 'Open orders', salesHistory: 'Sales history', operations: 'Operations',
           reports: 'Reports', tables: 'Tables', admin: 'Admin', manager: 'Manager', seller: 'Seller', administrator: 'Admin', logout: 'Logout',
-          title: 'Open orders', back: 'Back to products', history: 'Credit history',
+          title: 'Open orders', description: 'Open orders and credit history', back: 'Back to products', history: 'Credit history',
           paid: 'Paid', paidAmount: 'Paid', total: 'Total', remaining: 'Remaining',
           addProduct: 'Add products', partialPayment: 'Partial payment', fullPayment: 'Pay in full',
           searchCustomer: 'Search by customer name...', all: 'All', open: 'Open',
@@ -108,7 +108,7 @@
         ru: {
           products: 'Товары', openOrders: 'Открытые заказы', salesHistory: 'История продаж', operations: 'Операции',
           reports: 'Отчеты', tables: 'Столы', admin: 'Администратор', manager: 'Менеджер', seller: 'Продавец', administrator: 'Администратор', logout: 'Выход',
-          title: 'Открытые заказы', back: 'К товарам', history: 'История долгов',
+          title: 'Открытые заказы', description: 'Открытые заказы и история долгов', back: 'К товарам', history: 'История долгов',
           paid: 'Оплачено', paidAmount: 'Оплачено', total: 'Всего', remaining: 'Остаток',
           addProduct: 'Добавить товары', partialPayment: 'Частичная оплата', fullPayment: 'Оплатить полностью',
           searchCustomer: 'Поиск по имени клиента...', all: 'Все', open: 'Открытые',
@@ -122,7 +122,7 @@
         tr: {
           products: 'Ürünler', openOrders: 'Açık siparişler', salesHistory: 'Satış geçmişi', operations: 'İşlemler',
           reports: 'Raporlar', tables: 'Masalar', admin: 'Admin', manager: 'Yönetici', seller: 'Satıcı', administrator: 'Admin', logout: 'Çıkış',
-          title: 'Açık siparişler', back: 'Ürünlere dön', history: 'Borç geçmişi',
+          title: 'Açık siparişler', description: 'Açık siparişler ve borç geçmişi', back: 'Ürünlere dön', history: 'Borç geçmişi',
           paid: 'Ödendi', paidAmount: 'Ödenen', total: 'Toplam', remaining: 'Kalan',
           addProduct: 'Ürün ekle', partialPayment: 'Kısmi ödeme', fullPayment: 'Tam ödeme',
           searchCustomer: 'Müşteri adına göre ara...', all: 'Tümü', open: 'Açık',
@@ -149,6 +149,8 @@
         const reportsLink = document.querySelector('.nav-reports');
         if (operationsLink) operationsLink.textContent = dict.operations;
         if (reportsLink) reportsLink.textContent = dict.reports;
+        document.querySelector('.page-section-title').textContent = dict.title;
+        document.querySelector('.page-description').textContent = dict.description;
         document.querySelector('.role-label').textContent = currentRole === 'admin' ? dict.administrator : (currentRole === 'manager' ? dict.manager : dict.seller);
         document.querySelector('.logout-link').textContent = dict.logout;
         document.querySelector('.back-products').textContent = dict.back;

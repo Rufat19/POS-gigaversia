@@ -66,6 +66,17 @@
     </main>
 
     <script>
+      const adminHeaderTranslations = {
+        az: {title: 'Admin', description: 'Müştərinin istifadə edə biləcəyi bölmələri seçin'},
+        en: {title: 'Admin', description: 'Choose which sections customers can use'},
+        ru: {title: 'Администратор', description: 'Выберите разделы, доступные клиентам'},
+        tr: {title: 'Admin', description: 'Müşterilerin kullanabileceği bölümleri seçin'}
+      };
+      const savedLanguage = localStorage.getItem('pos_lang') || 'az';
+      const adminHeader = adminHeaderTranslations[savedLanguage] || adminHeaderTranslations.az;
+      document.querySelector('.page-section-title').textContent = adminHeader.title;
+      document.querySelector('.page-description').textContent = adminHeader.description;
+
       document.getElementById('save-permissions').addEventListener('click', async () => {
         const permissions = {};
         document.querySelectorAll('[data-feature]').forEach((input) => {

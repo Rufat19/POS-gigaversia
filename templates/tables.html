@@ -11,7 +11,7 @@
       <div class="page-title brand-header">
         {% include '_brand_lockup.html' %}
         <h1 class="page-section-title" data-i18n="tables">Masalar</h1>
-        <p class="page-description">Masa sifarişləri</p>
+        <p class="page-description" data-i18n="tablesDescription">Masa sifarişləri</p>
       </div>
       <div class="page-actions">
         <select id="tables-lang-select" class="lang-select" aria-label="Dil seçimi">
@@ -167,7 +167,7 @@
       const currentRole = '{{ "admin" if session.get("role") == "admin" else ("manager" if session.get("role") == "manager" else "seller") }}';
       const translations = {
         az: {
-          products:'Məhsullar', tables:'Masalar', openOrders:'Açıq qalanlar', salesHistory:'Satış tarixçəsi',
+          products:'Məhsullar', tables:'Masalar', tablesDescription:'Masa sifarişləri', openOrders:'Açıq qalanlar', salesHistory:'Satış tarixçəsi',
           operations:'Əməliyyatlar', reports:'Hesabatlar', admin:'Admin', manager:'Müdir', seller:'Satıcı',
           administrator:'Admin', logout:'Çıxış', legend:'Yaşıl masa boşdur, qırmızı masa doludur.',
           refresh:'Yenilə', table:'Masa', search:'Məhsul axtar...', send:'Masaya göndər',
@@ -187,7 +187,7 @@
           tableActionFailed:'Masa əməliyyatı uğursuz oldu.'
         },
         en: {
-          products:'Products', tables:'Tables', openOrders:'Open orders', salesHistory:'Sales history',
+          products:'Products', tables:'Tables', tablesDescription:'Table orders', openOrders:'Open orders', salesHistory:'Sales history',
           operations:'Operations', reports:'Reports', admin:'Admin', manager:'Manager', seller:'Seller',
           administrator:'Admin', logout:'Logout', legend:'Green is available, red is occupied.',
           refresh:'Refresh', table:'Table', search:'Search product...', send:'Send to table',
@@ -207,7 +207,7 @@
           tableActionFailed:'Table operation failed.'
         },
         ru: {
-          products:'Товары', tables:'Столы', openOrders:'Открытые заказы', salesHistory:'История продаж',
+          products:'Товары', tables:'Столы', tablesDescription:'Заказы по столам', openOrders:'Открытые заказы', salesHistory:'История продаж',
           operations:'Операции', reports:'Отчеты', admin:'Администратор', manager:'Менеджер',
           seller:'Продавец', administrator:'Администратор', logout:'Выход',
           legend:'Зелёный стол свободен, красный занят.', refresh:'Обновить', table:'Стол',
@@ -228,7 +228,7 @@
           tableActionFailed:'Не удалось выполнить действие со столом.'
         },
         tr: {
-          products:'Ürünler', tables:'Masalar', openOrders:'Açık siparişler', salesHistory:'Satış geçmişi',
+          products:'Ürünler', tables:'Masalar', tablesDescription:'Masa siparişleri', openOrders:'Açık siparişler', salesHistory:'Satış geçmişi',
           operations:'İşlemler', reports:'Raporlar', admin:'Admin', manager:'Yönetici', seller:'Satıcı',
           administrator:'Admin', logout:'Çıkış', legend:'Yeşil masa boş, kırmızı masa dolu.',
           refresh:'Yenile', table:'Masa', search:'Ürün ara...', send:'Masaya gönder',
