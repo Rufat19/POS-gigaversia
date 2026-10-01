@@ -1,0 +1,15 @@
+{
+  "name": "robo-pos-desktop",
+  "version": "1.0.0",
+  "description": "Robo POS desktop app for Windows",
+  "main": "main.js",
+  "private": true,
+  "scripts": {
+    "start": "electron .",
+    "dist:win": "electron-builder --config electron-builder.config.cjs --win nsis"
+  },
+  "devDependencies": {
+    "electron": "^44.5.1",
+    "electron-builder": "^26.15.3"
+  }
+}
