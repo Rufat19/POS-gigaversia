@@ -4,13 +4,14 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Satış tarixçəsi</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}?v=20261001-nav-swap">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}?v=20261001-robo-header">
   </head>
   <body>
     <div class="page-header">
-      <div class="page-title">
-        <h1 data-i18n="sales.title">Satış tarixçəsi</h1>
-        <p class="page-subtitle" data-i18n="sales.subtitle">Satışları tarix aralığına görə nəzərdən keçirin</p>
+      <div class="page-title brand-header">
+        {% include '_brand_lockup.html' %}
+        <h1 class="page-section-title" data-i18n="sales.title">Satış tarixçəsi</h1>
+        <p class="page-description" data-i18n="sales.subtitle">Satışları tarix aralığına görə nəzərdən keçirin</p>
       </div>
       <div class="page-actions">
         <div class="lang-switcher" aria-label="Dil seçimi">

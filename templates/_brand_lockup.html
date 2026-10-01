@@ -1,0 +1,36 @@
+<div class="brand-lockup" aria-label="RoBo">
+  <div class="brand-mark"><span class="brand-word">Ro<span class="brand-word-accent">Bo</span></span></div>
+  <svg class="brand-bot" viewBox="0 0 64 64" aria-hidden="true" focusable="false">
+    <path d="M32 13V8" stroke="#1d8ea8" stroke-width="3" stroke-linecap="round"/>
+    <circle cx="32" cy="6" r="4" fill="#f4b942"/>
+    <rect x="6" y="27" width="8" height="15" rx="4" fill="#1d8ea8"/>
+    <rect x="50" y="27" width="8" height="15" rx="4" fill="#1d8ea8"/>
+    <rect x="12" y="14" width="40" height="42" rx="14" fill="#0f172a"/>
+    <rect x="17" y="20" width="30" height="29" rx="10" fill="#dff8ff"/>
+    <circle cx="26" cy="31" r="3" fill="#0f172a"/>
+    <circle cx="38" cy="31" r="3" fill="#0f172a"/>
+    <path d="M25 39c2.1 2.2 4.4 3.2 7 3.2s4.9-1 7-3.2" fill="none" stroke="#1d8ea8" stroke-width="2.5" stroke-linecap="round"/>
+    <circle cx="21" cy="38" r="1.5" fill="#f4b942"/>
+  </svg>
+</div>
+<p class="brand-tagline">Premium POS — daha sürətli seçim, daha keyfiyyətli xidmət</p>
+<script>
+  (() => {
+    const slogans = {
+      az: 'Premium POS — daha sürətli seçim, daha keyfiyyətli xidmət',
+      en: 'Premium POS — faster choices, better service',
+      ru: 'Премиальная POS-система — быстрее обслуживание, выше качество',
+      tr: 'Premium POS — daha hızlı seçim, daha kaliteli hizmet'
+    };
+    const updateSlogan = (language) => {
+      const tagline = document.querySelector('.brand-tagline');
+      if (tagline) tagline.textContent = slogans[language] || slogans.az;
+    };
+    document.addEventListener('DOMContentLoaded', () => {
+      updateSlogan(localStorage.getItem('pos_lang') || 'az');
+    });
+    document.addEventListener('change', (event) => {
+      if (event.target.matches('.lang-select')) updateSlogan(event.target.value);
+    });
+  })();
+</script>

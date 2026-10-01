@@ -4,14 +4,14 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>POS - Məhsul siyahısı</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}?v=20261001-nav-swap">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}?v=20261001-robo-header">
 
   </head>
   <body>
     <div class="page-header">
       <div class="page-title brand-header">
-        <div class="brand-mark">RB19</div>
-        <p class="page-subtitle">Premium POS — daha sürətli seçim, daha keyfiyyətli xidmət</p>
+        {% include '_brand_lockup.html' %}
+        <h1 class="page-section-title" data-i18n="nav.products">Məhsullar</h1>
       </div>
       <div class="page-actions">
         <div class="lang-switcher" aria-label="Dil seçimi">
@@ -482,7 +482,7 @@
           </style></head><body>
           <main class="receipt">
             <header class="brand">
-              <div class="brand-name">RB19</div>
+              <div class="brand-name">RoBo</div>
               <div class="brand-subtitle">Satış qəbzi</div>
             </header>
             <div class="meta"><span>Satış №</span><strong>${saleId}</strong></div>

@@ -1,4 +1,4 @@
-# RB19 POS - Kiosk, Kafe, Kiçik restoran və Anbar sistemi
+# Robo POS - Kiosk, Kafe, Kiçik restoran və Anbar sistemi
 
 Kiçik biznes üçün hazırlanmış, toxunma-dostu (touch-friendly) satış nöqtəsi (POS) sistemi. Flask (Python) və PostgreSQL/SQLite üzərində qurulub, Railway-də deploy edilə bilər.
 

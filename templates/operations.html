@@ -4,13 +4,14 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Əməliyyatlar - Anbar hərəkətləri</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}?v=20261001-nav-swap">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}?v=20261001-robo-header">
   </head>
   <body>
     <div class="page-header">
-      <div class="page-title">
-        <h1>Əməliyyatlar</h1>
-        <p class="page-subtitle">Anbar daxilolmalarını və itkiləri idarə edin</p>
+      <div class="page-title brand-header">
+        {% include '_brand_lockup.html' %}
+        <h1 class="page-section-title" data-i18n="nav.operations">Əməliyyatlar</h1>
+        <p class="page-description">Anbar daxilolmalarını və itkiləri idarə edin</p>
       </div>
       <div class="page-actions">
         <div class="lang-switcher" aria-label="Dil seçimi">

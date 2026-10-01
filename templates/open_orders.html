@@ -4,13 +4,14 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Açıq qalanlar</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}?v=20261001-nav-swap">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}?v=20261001-robo-header">
   </head>
   <body>
     <div class="page-header">
       <div class="page-title brand-header">
-        <div class="brand-mark">RB19</div>
-        <p class="page-subtitle">Açıq sifarişlər və borc tarixçəsi</p>
+        {% include '_brand_lockup.html' %}
+        <h1 class="page-section-title" data-i18n="nav.openOrders">Açıq qalanlar</h1>
+        <p class="page-description">Açıq sifarişlər və borc tarixçəsi</p>
       </div>
       <div class="page-actions">
         <div class="lang-switcher" aria-label="Dil seçimi">
@@ -46,7 +47,6 @@
     <main class="container open-orders-page">
       <section>
         <div class="open-orders-heading">
-          <h1 class="open-orders-title">Açıq qalanlar</h1>
           <a class="btn primary back-products" href="/">Məhsullara qayıt</a>
         </div>
         <div class="orders-toolbar" aria-label="Borc filterləri">
@@ -151,7 +151,6 @@
         if (reportsLink) reportsLink.textContent = dict.reports;
         document.querySelector('.role-label').textContent = currentRole === 'admin' ? dict.administrator : (currentRole === 'manager' ? dict.manager : dict.seller);
         document.querySelector('.logout-link').textContent = dict.logout;
-        document.querySelector('.open-orders-title').textContent = dict.title;
         document.querySelector('.back-products').textContent = dict.back;
         document.querySelector('.paid-history-title').textContent = dict.history;
         document.getElementById('orders-search').placeholder = dict.searchCustomer;

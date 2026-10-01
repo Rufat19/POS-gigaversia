@@ -3,14 +3,15 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Masalar - RB19 POS</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}?v=20261001-nav-swap">
+    <title>Masalar - Robo POS</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}?v=20261001-robo-header">
   </head>
   <body>
     <div class="page-header">
       <div class="page-title brand-header">
-        <div class="brand-mark">RB19</div>
-        <p class="page-subtitle">Masa sifarişləri</p>
+        {% include '_brand_lockup.html' %}
+        <h1 class="page-section-title" data-i18n="tables">Masalar</h1>
+        <p class="page-description">Masa sifarişləri</p>
       </div>
       <div class="page-actions">
         <select id="tables-lang-select" class="lang-select" aria-label="Dil seçimi">
@@ -36,7 +37,6 @@
     <main class="container tables-page">
       <div class="tables-heading">
         <div>
-          <h1 data-i18n="tables">Masalar</h1>
           <p data-i18n="legend">Yaşıl masa boşdur, qırmızı masa doludur.</p>
         </div>
         <div class="tables-heading-actions">
