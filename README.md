@@ -36,6 +36,7 @@ Kiçik biznes üçün hazırlanmış, toxunma-dostu (touch-friendly) satış nö
 
 ### 4. Əməliyyatlar (Transactions)
 - Məhsul daxilolmaları və itkilər üçün anbar hərəkətləri tarixçəsi
+- Məhsullar kateqoriyasız saxlanıla bilər; kateqoriya silinəndə həmin məhsullar “Bütün” filtrində qalır və başqa kateqoriyaya daşınmır
 - Məhsul yaradarkən və dəyişdirərkən şəkil URL-i daxil etmək və ya 5 MB-dək JPG/PNG faylı yükləmək
 - Daxilolma qeyd ediləndə əlaqəli məhsulun stoku artır
 - İtki qeyd ediləndə stok azalır, mövcud stokdan çox itkiyə icazə verilmir

@@ -970,7 +970,9 @@ def _ensure_category(conn, database_url, category_name):
     """Create a category record if it does not already exist."""
     if category_name is None:
         return
-    name = str(category_name).strip() or 'Other'
+    name = str(category_name).strip()
+    if not name:
+        return
     if database_url:
         cur = conn.cursor()
         try:
@@ -3563,7 +3565,8 @@ def add_product():
     is_multipart = request.mimetype == "multipart/form-data"
     data = request.form if is_multipart else request.get_json(silent=True) or {}
     name = str(data.get('name', '')).strip()
-    category = str(data.get('category', 'Other') or 'Other').strip() or 'Other'
+    category_value = data.get('category', 'Other')
+    category = 'Other' if category_value is None else str(category_value).strip()
     try:
         price = _parse_decimal(data.get('price', 0))
     except (TypeError, ValueError):
@@ -3640,7 +3643,8 @@ def update_product(product_id):
     is_multipart = request.mimetype == "multipart/form-data"
     data = request.form if is_multipart else request.get_json(silent=True) or {}
     name = str(data.get('name', '')).strip()
-    category = str(data.get('category', 'Other') or 'Other').strip() or 'Other'
+    category_value = data.get('category', 'Other')
+    category = 'Other' if category_value is None else str(category_value).strip()
     try:
         price = _parse_decimal(data.get('price', 0))
     except (TypeError, ValueError):
@@ -3963,7 +3967,7 @@ def rename_category(category_name):
 
 @app.route('/api/categories/<category_name>', methods=['DELETE'])
 def delete_category(category_name):
-    """Delete a category by moving its products to Other."""
+    """Delete a category and leave its products uncategorized."""
     conn = get_db()
     database_url, _ = get_db_config()
     old_name = category_name.strip()
@@ -3971,18 +3975,16 @@ def delete_category(category_name):
         if database_url:
             cur = conn.cursor()
             try:
-                cur.execute("UPDATE products SET category = %s WHERE category = %s", ('Other', old_name))
+                cur.execute("UPDATE products SET category = '' WHERE category = %s", (old_name,))
                 cur.execute("DELETE FROM categories WHERE name = %s", (old_name,))
-                _ensure_category(conn, database_url, 'Other')
                 conn.commit()
             finally:
                 cur.close()
         else:
             cur = conn.cursor()
             try:
-                cur.execute("UPDATE products SET category = ? WHERE category = ?", ('Other', old_name))
+                cur.execute("UPDATE products SET category = '' WHERE category = ?", (old_name,))
                 cur.execute("DELETE FROM categories WHERE name = ?", (old_name,))
-                _ensure_category(conn, database_url, 'Other')
                 conn.commit()
             finally:
                 cur.close()

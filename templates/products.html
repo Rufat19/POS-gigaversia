@@ -89,7 +89,7 @@
 
         <section id="products-grid" class="products-grid pos-grid">
           {% for product in products %}
-            <div class="product-card" data-category="{{ product.category }}">
+            <div class="product-card" data-category="{{ product.category or '' }}">
               <div class="product-card-bg">
                 {% if product.image_url %}
                   <img src="{{ product.image_url }}" alt="{{ product.name }}" loading="lazy" onerror="this.hidden=true;">
@@ -98,7 +98,9 @@
               <div class="product-price-tag">{{ "%.2f" | format(product.price) }} AZN</div>
               <div class="product-name-text">{{ product.name }}</div>
               <div class="product-meta-row">
-                <span class="product-category-pill">{{ product.category }}</span>
+                {% if product.category %}
+                  <span class="product-category-pill">{{ product.category }}</span>
+                {% endif %}
                 <span class="product-stock-text">Stok: <span id="stock-{{ product.id }}">{{ product.stock }}</span></span>
               </div>
               <div class="product-actions-row">

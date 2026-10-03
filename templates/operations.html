@@ -99,6 +99,7 @@
             <label class="form-group">
               <span data-i18n="operations.category">Kateqoriya</span>
               <select id="new-product-category">
+                <option value="" data-i18n="operations.uncategorized">Kateqoriyasız</option>
                 {% for cat in categories %}
                   <option value="{{ cat }}">{{ cat }}</option>
                 {% endfor %}
@@ -140,10 +141,10 @@
           </label>
           <div id="product-management-list" class="management-list">
             {% for p in products %}
-            <div class="management-row" data-product-id="{{ p.id }}" data-product-name="{{ p.name }}" data-product-category="{{ p.category }}" data-product-price="{{ p.price }}" data-product-stock="{{ p.stock }}" data-product-image="{{ p.image_url or '' }}">
+            <div class="management-row" data-product-id="{{ p.id }}" data-product-name="{{ p.name }}" data-product-category="{{ p.category or '' }}" data-product-price="{{ p.price }}" data-product-stock="{{ p.stock }}" data-product-image="{{ p.image_url or '' }}">
                 <div>
                 <strong>{{ p.name }}</strong><br>
-                <span>{{ p.category }} · {{ p.price }} AZN · Stok: {{ p.stock }}</span>
+                <span>{{ p.category or '—' }} · {{ p.price }} AZN · Stok: {{ p.stock }}</span>
                 </div>
                 <div class="inline-actions">
                   <button class="btn secondary product-edit-btn" type="button" data-i18n="operations.edit">Edit</button>
@@ -321,6 +322,7 @@
           'operations.addProduct': 'Məhsul əlavə et',
           'operations.productName': 'Məhsul adı',
           'operations.category': 'Kateqoriya',
+          'operations.uncategorized': 'Kateqoriyasız',
           'operations.price': 'Qiymət',
           'operations.stock': 'Stok',
           'operations.imageUrl': 'Şəkil URL',
@@ -378,7 +380,7 @@
           'operations.alert.stockMovementRequired': 'Məhsul və müsbət miqdar seçin',
           'operations.alert.confirmDelete': 'Bu məhsulu silmək istədiyinizə əminsiniz?',
           'operations.alert.confirmArchiveAll': 'Bütün aktiv məhsullar arxivlənsin? Satış, borc və masa tarixçəsi qorunacaq.',
-          'operations.alert.confirmCategoryDelete': ' kateqoriyasını silmək istədiyinizə əminsiniz? Məhsullar "Other" kateqoriyasına keçirəcək.',
+          'operations.alert.confirmCategoryDelete': ' kateqoriyasını silmək istədiyinizə əminsiniz? Məhsullar kateqoriyasız qalacaq.',
           'operations.alert.success.categoryAdd': 'Kateqoriya əlavə edildi.',
           'operations.alert.success.categoryRename': 'Kateqoriya dəyişdirildi.',
           'operations.alert.success.categoryDelete': 'Kateqoriya silindi.',
@@ -410,6 +412,7 @@
           'operations.addProduct': 'Add product',
           'operations.productName': 'Product name',
           'operations.category': 'Category',
+          'operations.uncategorized': 'Uncategorized',
           'operations.price': 'Price',
           'operations.stock': 'Stock',
           'operations.imageUrl': 'Image URL',
@@ -467,7 +470,7 @@
           'operations.alert.stockMovementRequired': 'Select a product and positive quantity.',
           'operations.alert.confirmDelete': 'Are you sure you want to delete this product?',
           'operations.alert.confirmArchiveAll': 'Archive all active products? Sales, credit, and table history will be preserved.',
-          'operations.alert.confirmCategoryDelete': ' are you sure you want to delete this category? Products will move to "Other".',
+          'operations.alert.confirmCategoryDelete': ' are you sure you want to delete this category? Products will remain uncategorized.',
           'operations.alert.success.categoryAdd': 'Category added.',
           'operations.alert.success.categoryRename': 'Category renamed.',
           'operations.alert.success.categoryDelete': 'Category deleted.',
@@ -499,6 +502,7 @@
           'operations.addProduct': 'Добавить товар',
           'operations.productName': 'Название товара',
           'operations.category': 'Категория',
+          'operations.uncategorized': 'Без категории',
           'operations.price': 'Цена',
           'operations.stock': 'Остаток',
           'operations.imageUrl': 'URL изображения',
@@ -556,7 +560,7 @@
           'operations.alert.stockMovementRequired': 'Выберите товар и положительное количество.',
           'operations.alert.confirmDelete': 'Вы уверены, что хотите удалить этот товар?',
           'operations.alert.confirmArchiveAll': 'Архивировать все активные товары? История продаж, долгов и столов сохранится.',
-          'operations.alert.confirmCategoryDelete': ' вы уверены, что хотите удалить эту категорию? Товары будут перенесены в "Other".',
+          'operations.alert.confirmCategoryDelete': ' вы уверены, что хотите удалить эту категорию? Товары останутся без категории.',
           'operations.alert.success.categoryAdd': 'Категория добавлена.',
           'operations.alert.success.categoryRename': 'Категория переименована.',
           'operations.alert.success.categoryDelete': 'Категория удалена.',
@@ -588,6 +592,7 @@
           'operations.addProduct': 'Ürün ekle',
           'operations.productName': 'Ürün adı',
           'operations.category': 'Kategori',
+          'operations.uncategorized': 'Kategorisiz',
           'operations.price': 'Fiyat',
           'operations.stock': 'Stok',
           'operations.imageUrl': 'Görsel URL',
@@ -645,7 +650,7 @@
           'operations.alert.stockMovementRequired': 'Ürün ve pozitif miktar seçin.',
           'operations.alert.confirmDelete': 'Bu ürünü silmek istediğinize emin misiniz?',
           'operations.alert.confirmArchiveAll': 'Tüm aktif ürünler arşivlensin mi? Satış, borç ve masa geçmişi korunacak.',
-          'operations.alert.confirmCategoryDelete': ' kategorisini silmek istediğinize emin misiniz? Ürünler "Other" kategorisine taşınacak.',
+          'operations.alert.confirmCategoryDelete': ' kategorisini silmek istediğinize emin misiniz? Ürünler kategorisiz kalacak.',
           'operations.alert.success.categoryAdd': 'Kategori eklendi.',
           'operations.alert.success.categoryRename': 'Kategori yeniden adlandırıldı.',
           'operations.alert.success.categoryDelete': 'Kategori silindi.',
@@ -929,7 +934,7 @@
         if (!row) return;
         editingProductId = productId;
         productEditForm.elements.name.value = row.dataset.productName || '';
-        productEditForm.elements.category.value = row.dataset.productCategory || 'Other';
+        productEditForm.elements.category.value = row.dataset.productCategory || '';
         productEditForm.elements.price.value = row.dataset.productPrice || '0';
         productEditForm.elements.stock.value = row.dataset.productStock || '0';
         productEditForm.elements.image_url.value = row.dataset.productImage || '';
@@ -947,7 +952,7 @@
         if (editingProductId === null) return;
 
         const name = productEditForm.elements.name.value.trim();
-        const category = productEditForm.elements.category.value.trim() || 'Other';
+        const category = productEditForm.elements.category.value.trim();
         const price = parseMoneyInput(productEditForm.elements.price.value);
         const stock = Number(productEditForm.elements.stock.value);
         const image_url = productEditForm.elements.image_url.value.trim() || null;
@@ -1003,7 +1008,7 @@
 
       document.getElementById('add-product-btn').addEventListener('click', async ()=>{
         const name = document.getElementById('new-product-name').value.trim();
-        const category = document.getElementById('new-product-category').value || 'Other';
+        const category = document.getElementById('new-product-category').value;
         const price = parseMoneyInput(document.getElementById('new-product-price').value || 0);
         const stock = Number(document.getElementById('new-product-stock').value || 0);
         const image_url = document.getElementById('new-product-image').value.trim();
