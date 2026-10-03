@@ -228,6 +228,9 @@ html{scroll-behavior:smooth}
 .qty-input{width:74px;padding:9px 10px;border-radius:12px;border:1px solid rgba(255,255,255,0.18);background:rgba(255,255,255,0.08);color:#fff;font-size:0.82rem;}
 .qty-input::placeholder{color:rgba(255,255,255,0.62);}
 .add-btn{width:42px;height:42px;border:none;border-radius:12px;background:#715543;color:#fff;font-size:1.5rem;line-height:1;cursor:pointer;box-shadow:0 4px 10px rgba(67,48,35,0.12);}
+.product-card .add-btn{border:2px solid rgba(255,255,255,0.92);background:linear-gradient(145deg,#ffd166,#f4b942);color:#17212d;font-weight:800;box-shadow:0 0 0 2px rgba(15,23,42,0.28),0 6px 16px rgba(15,23,42,0.24);}
+.product-card .add-btn:hover{background:linear-gradient(145deg,#ffe08a,#ffc94d);box-shadow:0 0 0 2px rgba(15,23,42,0.32),0 8px 18px rgba(15,23,42,0.28);}
+.product-card .add-btn:focus-visible{outline:3px solid #fff;outline-offset:3px;box-shadow:0 0 0 6px rgba(29,142,168,0.85);}
 .cart-box-main{background:rgba(255,255,255,0.8);-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);border-radius:24px;padding:18px 16px 16px;box-shadow:var(--pos-shadow);border:1px solid rgba(148,163,184,0.2);}
 .cart-header-row{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;}
 .cart-title{margin:0;font-size:1.5rem;color:#111827;}
