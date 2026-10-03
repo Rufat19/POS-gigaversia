@@ -116,6 +116,11 @@
               <span data-i18n="operations.imageUrl">Şəkil URL</span>
               <input id="new-product-image" placeholder="(isteğe bağlı)" data-i18n-placeholder="operations.imagePlaceholder">
             </label>
+            <label class="form-group">
+              <span data-i18n="operations.imageUpload">Şəkil yüklə (JPG/PNG)</span>
+              <input id="new-product-image-file" type="file" accept=".jpg,.jpeg,.png,image/jpeg,image/png">
+              <small class="image-upload-hint" data-i18n="operations.imageUploadHint">5 MB-dək; fayl seçilsə, URL əvəzinə o istifadə edilir.</small>
+            </label>
             <div class="form-actions">
               <button id="add-product-btn" class="add-btn" type="button" data-i18n="operations.addProduct">Məhsul əlavə et</button>
               <div id="product-msg" class="form-message"></div>
@@ -278,6 +283,11 @@
           <span data-i18n="operations.imageUrl">Şəkil URL</span>
           <input id="edit-product-image" name="image_url" type="text">
         </label>
+        <label class="form-group">
+          <span data-i18n="operations.imageUpload">Şəkil yüklə (JPG/PNG)</span>
+          <input id="edit-product-image-file" name="image" type="file" accept=".jpg,.jpeg,.png,image/jpeg,image/png">
+          <small class="image-upload-hint" data-i18n="operations.imageUploadHint">5 MB-dək; fayl seçilsə, URL əvəzinə o istifadə edilir.</small>
+        </label>
         <div id="product-edit-message" class="form-message" aria-live="polite"></div>
         <div class="form-actions">
           <button id="cancel-product-edit" class="btn secondary" type="button" data-i18n="operations.cancel">Ləğv et</button>
@@ -314,6 +324,8 @@
           'operations.price': 'Qiymət',
           'operations.stock': 'Stok',
           'operations.imageUrl': 'Şəkil URL',
+          'operations.imageUpload': 'Şəkil yüklə (JPG/PNG)',
+          'operations.imageUploadHint': '5 MB-dək; fayl seçilsə, URL əvəzinə o istifadə edilir.',
           'operations.manageProducts': 'Məhsul idarəetməsi',
           'operations.manageProductSearchLabel': 'Məhsul adına görə axtar',
           'operations.noMatchingProducts': 'Axtarışa uyğun məhsul tapılmadı.',
@@ -401,6 +413,8 @@
           'operations.price': 'Price',
           'operations.stock': 'Stock',
           'operations.imageUrl': 'Image URL',
+          'operations.imageUpload': 'Upload image (JPG/PNG)',
+          'operations.imageUploadHint': 'Up to 5 MB; an uploaded file takes precedence over the URL.',
           'operations.manageProducts': 'Manage products',
           'operations.manageProductSearchLabel': 'Search products by name',
           'operations.noMatchingProducts': 'No products match your search.',
@@ -488,6 +502,8 @@
           'operations.price': 'Цена',
           'operations.stock': 'Остаток',
           'operations.imageUrl': 'URL изображения',
+          'operations.imageUpload': 'Загрузить изображение (JPG/PNG)',
+          'operations.imageUploadHint': 'До 5 МБ; загруженный файл имеет приоритет над URL.',
           'operations.manageProducts': 'Управление товарами',
           'operations.manageProductSearchLabel': 'Поиск товара по названию',
           'operations.noMatchingProducts': 'По вашему запросу товары не найдены.',
@@ -575,6 +591,8 @@
           'operations.price': 'Fiyat',
           'operations.stock': 'Stok',
           'operations.imageUrl': 'Görsel URL',
+          'operations.imageUpload': 'Görsel yükle (JPG/PNG)',
+          'operations.imageUploadHint': 'En fazla 5 MB; yüklenen dosya URL yerine kullanılır.',
           'operations.manageProducts': 'Ürün yönetimi',
           'operations.manageProductSearchLabel': 'Ürün adına göre ara',
           'operations.noMatchingProducts': 'Aramanızla eşleşen ürün bulunamadı.',
@@ -915,6 +933,7 @@
         productEditForm.elements.price.value = row.dataset.productPrice || '0';
         productEditForm.elements.stock.value = row.dataset.productStock || '0';
         productEditForm.elements.image_url.value = row.dataset.productImage || '';
+        productEditForm.elements.image.value = '';
         productEditMessage.textContent = '';
         productEditDialog.showModal();
       }
@@ -932,6 +951,7 @@
         const price = parseMoneyInput(productEditForm.elements.price.value);
         const stock = Number(productEditForm.elements.stock.value);
         const image_url = productEditForm.elements.image_url.value.trim() || null;
+        const imageFile = document.getElementById('edit-product-image-file').files[0];
         const saveButton = document.getElementById('save-product-edit');
 
         if (!name || price === null || price < 0 || !Number.isInteger(stock) || stock < 0) {
@@ -943,10 +963,16 @@
         saveButton.textContent = t('operations.editSaving');
         productEditMessage.textContent = '';
         try {
+          const formData = new FormData();
+          formData.append('name', name);
+          formData.append('category', category);
+          formData.append('price', price);
+          formData.append('stock', stock);
+          formData.append('image_url', image_url || '');
+          if (imageFile) formData.append('image', imageFile);
           const response = await fetch(`/api/products/${editingProductId}`, {
             method: 'PUT',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({name, category, price, stock, image_url})
+            body: formData
           });
           const result = await response.json();
           if (!response.ok) throw new Error(result.message || 'Product update failed.');
@@ -981,6 +1007,7 @@
         const price = parseMoneyInput(document.getElementById('new-product-price').value || 0);
         const stock = Number(document.getElementById('new-product-stock').value || 0);
         const image_url = document.getElementById('new-product-image').value.trim();
+        const imageFile = document.getElementById('new-product-image-file').files[0];
         const msg = document.getElementById('product-msg');
         if(!name){ msg.textContent = t('operations.alert.productRequired'); return; }
         if (price === null || !Number.isFinite(stock)) {
@@ -988,7 +1015,14 @@
           return;
         }
         try {
-          const res = await fetch('/add_product', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({name, category, price, stock, image_url})});
+          const formData = new FormData();
+          formData.append('name', name);
+          formData.append('category', category);
+          formData.append('price', price);
+          formData.append('stock', stock);
+          formData.append('image_url', image_url);
+          if (imageFile) formData.append('image', imageFile);
+          const res = await fetch('/add_product', {method:'POST', body:formData});
           const data = await res.json();
           if(!res.ok) throw new Error(data.message || 'Product add failed.');
           msg.textContent = t('operations.alert.success.productAdd');
@@ -996,6 +1030,7 @@
           document.getElementById('new-product-price').value='0';
           document.getElementById('new-product-stock').value='0';
           document.getElementById('new-product-image').value='';
+          document.getElementById('new-product-image-file').value='';
           location.reload();
         } catch(e){ msg.textContent='Xəta: '+e.message; }
       });

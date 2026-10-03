@@ -96,6 +96,7 @@ html{scroll-behavior:smooth}
 .form-group input:focus,
 .form-group select:focus,
 .form-group textarea:focus{outline:none;border-color:rgba(29,142,168,0.46);box-shadow:0 0 0 4px rgba(29,142,168,0.10);}
+.image-upload-hint{color:#64748b;font-size:.74rem;font-weight:500;}
 .form-actions{display:flex;align-items:center;gap:10px;flex-wrap:wrap;min-height:44px;}
 .form-message{min-height:18px;font-size:0.8rem;color:#0f766e;font-weight:700;}
 .inline-actions{display:flex;gap:8px;flex-wrap:wrap;}

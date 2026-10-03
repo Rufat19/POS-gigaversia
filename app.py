@@ -11,6 +11,7 @@ import re
 import smtplib
 import ssl
 import time
+import uuid
 from email.message import EmailMessage
 from email.utils import getaddresses
 from datetime import datetime, timedelta, timezone
@@ -29,6 +30,7 @@ from flask import (
     render_template,
     request,
     send_file,
+    send_from_directory,
     session,
     url_for,
 )
@@ -40,6 +42,11 @@ load_dotenv()
 
 app = Flask(__name__)
 app.config["JSON_SORT_KEYS"] = False
+app.config["MAX_CONTENT_LENGTH"] = 5 * 1024 * 1024 + 64 * 1024
+app.config["PRODUCT_IMAGE_UPLOAD_DIR"] = os.getenv(
+    "PRODUCT_IMAGE_UPLOAD_DIR",
+    str(Path(app.instance_path) / "product-images"),
+)
 BAKU_TIMEZONE = timezone(timedelta(hours=4), name="AZT")
 database_url = os.getenv("DATABASE_URL")
 secret_key = os.getenv("SECRET_KEY")
@@ -71,6 +78,13 @@ def forbidden_page(error):
         role=session.get("role"),
         is_admin=session.get("role") == "admin",
     ), 403
+
+
+@app.errorhandler(413)
+def request_entity_too_large(error):
+    """Return a consistent JSON error when an uploaded image exceeds the limit."""
+    return jsonify({"success": False, "message": "Şəkil 5 MB-dan böyük ola bilməz."}), 413
+
 
 PIN_USERS = {
     seller_pin or "1111": "seller",
@@ -234,7 +248,7 @@ def _get_permissions(conn, database_url):
 
 
 def _feature_for_endpoint(endpoint):
-    if endpoint in {"products_page", "checkout"} or endpoint in {
+    if endpoint in {"products_page", "checkout", "product_image"} or endpoint in {
         "add_product", "update_product", "delete_product", "archive_all_products"
     }:
         return "products"
@@ -3493,14 +3507,61 @@ def pay_credit_order(order_id):
         cur.close()
 
 
+def _remove_uploaded_product_image(image_path):
+    if image_path is None:
+        return
+    try:
+        image_path.unlink()
+    except FileNotFoundError:
+        return
+    except OSError:
+        app.logger.exception("Could not remove an uncommitted product image.")
+
+
+def _save_uploaded_product_image(image_file):
+    if image_file is None or not image_file.filename:
+        return None, None
+
+    extension = Path(image_file.filename).suffix.lower()
+    if extension not in {".jpg", ".jpeg", ".png"}:
+        raise ValueError("Yalnız JPG və PNG şəkillər yükləmək olar.")
+
+    signature = image_file.stream.read(8)
+    image_file.stream.seek(0, os.SEEK_END)
+    image_size = image_file.stream.tell()
+    image_file.stream.seek(0)
+    if image_size > 5 * 1024 * 1024:
+        raise ValueError("Şəkil 5 MB-dan böyük ola bilməz.")
+    is_jpeg = extension in {".jpg", ".jpeg"} and signature.startswith(b"\xff\xd8\xff")
+    is_png = extension == ".png" and signature == b"\x89PNG\r\n\x1a\n"
+    if not (is_jpeg or is_png):
+        raise ValueError("Faylın məzmunu JPG və ya PNG şəkli deyil.")
+
+    upload_dir = Path(app.config["PRODUCT_IMAGE_UPLOAD_DIR"])
+    upload_dir.mkdir(parents=True, exist_ok=True)
+    image_path = upload_dir / f"{uuid.uuid4().hex}{extension}"
+    try:
+        image_file.save(image_path)
+    except OSError:
+        _remove_uploaded_product_image(image_path)
+        raise
+    return url_for("product_image", filename=image_path.name), image_path
+
+
+@app.route("/product-images/<path:filename>")
+def product_image(filename):
+    """Serve a previously uploaded product image."""
+    return send_from_directory(app.config["PRODUCT_IMAGE_UPLOAD_DIR"], filename)
+
+
 @app.route('/add_product', methods=['POST'])
 def add_product():
     """API endpoint to add a new product.
 
-    Accepts JSON: {name, category, price, stock, image_url} and inserts a new
-    product row, returning the created product id.
+    Accepts JSON or multipart form data and inserts a product row.
     """
-    data = request.get_json(silent=True) or {}
+    is_multipart = request.mimetype == "multipart/form-data"
+    data = request.form if is_multipart else request.get_json(silent=True) or {}
     name = str(data.get('name', '')).strip()
     category = str(data.get('category', 'Other') or 'Other').strip() or 'Other'
     try:
@@ -3511,12 +3572,25 @@ def add_product():
         stock = int(data.get('stock', 0))
     except (TypeError, ValueError):
         return jsonify({'success': False, 'message': 'Invalid stock'}), 400
-    image_url = data.get('image_url')
+    image_url = str(data.get('image_url') or '').strip() or None
     if not name:
         return jsonify({'success': False, 'message': 'Məhsul adı vacibdir'}), 400
 
     conn = get_db()
     database_url, _ = get_db_config()
+    uploaded_image_path = None
+    try:
+        uploaded_image_url, uploaded_image_path = _save_uploaded_product_image(
+            request.files.get("image") if is_multipart else None
+        )
+        if uploaded_image_url:
+            image_url = uploaded_image_url
+    except ValueError as exc:
+        return jsonify({'success': False, 'message': str(exc)}), 400
+    except OSError:
+        app.logger.exception("Could not save an uploaded product image.")
+        return jsonify({'success': False, 'message': 'Şəkil yadda saxlanarkən xəta baş verdi.'}), 500
+
     try:
         if database_url:
             cur = conn.cursor()
@@ -3556,13 +3630,15 @@ def add_product():
                 cur.close()
     except (sqlite3.Error, psycopg2.Error) as exc:
         conn.rollback()
+        _remove_uploaded_product_image(uploaded_image_path)
         return jsonify({'success': False, 'message': str(exc)}), 500
 
 
 @app.route('/api/products/<int:product_id>', methods=['PUT'])
 def update_product(product_id):
     """Update a product record."""
-    data = request.get_json(silent=True) or {}
+    is_multipart = request.mimetype == "multipart/form-data"
+    data = request.form if is_multipart else request.get_json(silent=True) or {}
     name = str(data.get('name', '')).strip()
     category = str(data.get('category', 'Other') or 'Other').strip() or 'Other'
     try:
@@ -3573,12 +3649,25 @@ def update_product(product_id):
         stock = int(data.get('stock', 0))
     except (TypeError, ValueError):
         return jsonify({'success': False, 'message': 'Invalid stock'}), 400
-    image_url = data.get('image_url')
+    image_url = str(data.get('image_url') or '').strip() or None
     if not name:
         return jsonify({'success': False, 'message': 'Məhsul adı vacibdir'}), 400
 
     conn = get_db()
     database_url, _ = get_db_config()
+    uploaded_image_path = None
+    try:
+        uploaded_image_url, uploaded_image_path = _save_uploaded_product_image(
+            request.files.get("image") if is_multipart else None
+        )
+        if uploaded_image_url:
+            image_url = uploaded_image_url
+    except ValueError as exc:
+        return jsonify({'success': False, 'message': str(exc)}), 400
+    except OSError:
+        app.logger.exception("Could not save an uploaded product image.")
+        return jsonify({'success': False, 'message': 'Şəkil yadda saxlanarkən xəta baş verdi.'}), 500
+
     try:
         if database_url:
             cur = conn.cursor()
@@ -3588,6 +3677,7 @@ def update_product(product_id):
                     (name, category, price, stock, image_url, product_id),
                 )
                 if cur.rowcount == 0:
+                    _remove_uploaded_product_image(uploaded_image_path)
                     return jsonify({'success': False, 'message': 'Məhsul tapılmadı'}), 404
                 _ensure_category(conn, database_url, category)
                 _audit_event(conn, database_url, "product_updated", "product", product_id, name)
@@ -3603,6 +3693,7 @@ def update_product(product_id):
                     (name, category, price, stock, image_url, product_id),
                 )
                 if cur.rowcount == 0:
+                    _remove_uploaded_product_image(uploaded_image_path)
                     return jsonify({'success': False, 'message': 'Məhsul tapılmadı'}), 404
                 _ensure_category(conn, database_url, category)
                 _audit_event(conn, database_url, "product_updated", "product", product_id, name)
@@ -3612,6 +3703,7 @@ def update_product(product_id):
                 cur.close()
     except (sqlite3.Error, psycopg2.Error) as exc:
         conn.rollback()
+        _remove_uploaded_product_image(uploaded_image_path)
         return jsonify({'success': False, 'message': str(exc)}), 500
 
 

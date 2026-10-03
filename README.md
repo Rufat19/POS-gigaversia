@@ -36,6 +36,7 @@ Kiçik biznes üçün hazırlanmış, toxunma-dostu (touch-friendly) satış nö
 
 ### 4. Əməliyyatlar (Transactions)
 - Məhsul daxilolmaları və itkilər üçün anbar hərəkətləri tarixçəsi
+- Məhsul yaradarkən və dəyişdirərkən şəkil URL-i daxil etmək və ya 5 MB-dək JPG/PNG faylı yükləmək
 - Daxilolma qeyd ediləndə əlaqəli məhsulun stoku artır
 - İtki qeyd ediləndə stok azalır, mövcud stokdan çox itkiyə icazə verilmir
 - Satış zamanı stok miqdarı satışa mane olmur və qalıq mənfiyə düşə bilər
@@ -113,6 +114,13 @@ python app.py
 ```
 
 Brauzerdə aç: `http://127.0.0.1:5000`
+
+Yüklənən məhsul şəkilləri standart olaraq Flask-ın `instance/product-images` qovluğunda
+saxlanılır. Başqa qovluq seçmək üçün `PRODUCT_IMAGE_UPLOAD_DIR` dəyişənini təyin edin.
+Railway kimi ephemeral fayl sistemi olan hostinqdə şəkillərin deploy-lar arasında
+saxlanması üçün bu dəyişəni persistent volume-a bağlanmış qovluğa yönləndirin; əks
+halda yenidən deploy zamanı yüklənmiş fayllar itə bilər. Mövcud şəkil URL-i alternativ
+olaraq işləməyə davam edir.
 
 Qəbz çapı zamanı printer parametrlərində 80 mm rulon ölçüsünü seçin, kənar boşluqları
 minimuma endirin və brauzerin çap dialoqunda Xprinter-i göstərin. Adi brauzer rejimində
