@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Əməliyyatlar - Anbar hərəkətləri</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}?v=20261001-radio">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}?v=20261003-product-edit">
   </head>
   <body>
     <div class="page-header">
@@ -129,6 +129,10 @@
             <button id="archive-all-products-btn" class="btn danger" type="button" data-i18n="operations.archiveAllProducts">Bütün məhsulları arxivlə</button>
           </div>
           <div id="archive-products-message" class="form-message" aria-live="polite"></div>
+          <label class="form-group product-management-search">
+            <span data-i18n="operations.manageProductSearchLabel">Məhsul adına görə axtar</span>
+            <input id="product-management-search" type="search" placeholder="Ad axtar..." data-i18n-placeholder="operations.productSearchPlaceholder">
+          </label>
           <div id="product-management-list" class="management-list">
             {% for p in products %}
             <div class="management-row" data-product-id="{{ p.id }}" data-product-name="{{ p.name }}" data-product-category="{{ p.category }}" data-product-price="{{ p.price }}" data-product-stock="{{ p.stock }}" data-product-image="{{ p.image_url or '' }}">
@@ -143,6 +147,7 @@
               </div>
             {% endfor %}
           </div>
+          <p id="product-management-empty" class="product-management-empty" data-i18n="operations.noMatchingProducts" hidden>Axtarışa uyğun məhsul tapılmadı.</p>
         </section>
 
         <section class="card operations-card">
@@ -250,6 +255,37 @@
       </div>
     </div>
 
+    <dialog id="product-edit-dialog" class="product-edit-dialog">
+      <form id="product-edit-form" class="product-edit-form">
+        <h2 data-i18n="operations.editProductTitle">Məhsulu dəyişdir</h2>
+        <label class="form-group">
+          <span data-i18n="operations.productName">Məhsul adı</span>
+          <input id="edit-product-name" name="name" type="text" required maxlength="200">
+        </label>
+        <label class="form-group">
+          <span data-i18n="operations.category">Kateqoriya</span>
+          <input id="edit-product-category" name="category" type="text" maxlength="50">
+        </label>
+        <label class="form-group">
+          <span data-i18n="operations.price">Qiymət</span>
+          <input id="edit-product-price" name="price" type="text" inputmode="decimal" required>
+        </label>
+        <label class="form-group">
+          <span data-i18n="operations.stock">Stok</span>
+          <input id="edit-product-stock" name="stock" type="number" min="0" step="1" required>
+        </label>
+        <label class="form-group">
+          <span data-i18n="operations.imageUrl">Şəkil URL</span>
+          <input id="edit-product-image" name="image_url" type="text">
+        </label>
+        <div id="product-edit-message" class="form-message" aria-live="polite"></div>
+        <div class="form-actions">
+          <button id="cancel-product-edit" class="btn secondary" type="button" data-i18n="operations.cancel">Ləğv et</button>
+          <button id="save-product-edit" class="btn primary" type="submit" data-i18n="operations.saveChanges">Yadda saxla</button>
+        </div>
+      </form>
+    </dialog>
+
     <script>
       const translations = {
         az: {
@@ -279,6 +315,13 @@
           'operations.stock': 'Stok',
           'operations.imageUrl': 'Şəkil URL',
           'operations.manageProducts': 'Məhsul idarəetməsi',
+          'operations.manageProductSearchLabel': 'Məhsul adına görə axtar',
+          'operations.noMatchingProducts': 'Axtarışa uyğun məhsul tapılmadı.',
+          'operations.editProductTitle': 'Məhsulu dəyişdir',
+          'operations.cancel': 'Ləğv et',
+          'operations.saveChanges': 'Yadda saxla',
+          'operations.editSaving': 'Yadda saxlanılır...',
+          'operations.productEditInvalid': 'Qiymət, stok və məhsul adı düzgün daxil edilməlidir.',
           'operations.archiveAllProducts': 'Bütün məhsulları arxivlə',
           'operations.edit': 'Dəyişdir',
           'operations.delete': 'Sil',
@@ -359,6 +402,13 @@
           'operations.stock': 'Stock',
           'operations.imageUrl': 'Image URL',
           'operations.manageProducts': 'Manage products',
+          'operations.manageProductSearchLabel': 'Search products by name',
+          'operations.noMatchingProducts': 'No products match your search.',
+          'operations.editProductTitle': 'Edit product',
+          'operations.cancel': 'Cancel',
+          'operations.saveChanges': 'Save changes',
+          'operations.editSaving': 'Saving...',
+          'operations.productEditInvalid': 'Enter a valid product name, price, and stock.',
           'operations.archiveAllProducts': 'Archive all products',
           'operations.edit': 'Edit',
           'operations.delete': 'Delete',
@@ -439,6 +489,13 @@
           'operations.stock': 'Остаток',
           'operations.imageUrl': 'URL изображения',
           'operations.manageProducts': 'Управление товарами',
+          'operations.manageProductSearchLabel': 'Поиск товара по названию',
+          'operations.noMatchingProducts': 'По вашему запросу товары не найдены.',
+          'operations.editProductTitle': 'Изменить товар',
+          'operations.cancel': 'Отмена',
+          'operations.saveChanges': 'Сохранить',
+          'operations.editSaving': 'Сохранение...',
+          'operations.productEditInvalid': 'Введите корректные название, цену и остаток товара.',
           'operations.archiveAllProducts': 'Архивировать все товары',
           'operations.edit': 'Изменить',
           'operations.delete': 'Удалить',
@@ -519,6 +576,13 @@
           'operations.stock': 'Stok',
           'operations.imageUrl': 'Görsel URL',
           'operations.manageProducts': 'Ürün yönetimi',
+          'operations.manageProductSearchLabel': 'Ürün adına göre ara',
+          'operations.noMatchingProducts': 'Aramanızla eşleşen ürün bulunamadı.',
+          'operations.editProductTitle': 'Ürünü düzenle',
+          'operations.cancel': 'İptal',
+          'operations.saveChanges': 'Kaydet',
+          'operations.editSaving': 'Kaydediliyor...',
+          'operations.productEditInvalid': 'Geçerli bir ürün adı, fiyatı ve stok miktarı girin.',
           'operations.archiveAllProducts': 'Tüm ürünleri arşivle',
           'operations.edit': 'Düzenle',
           'operations.delete': 'Sil',
@@ -837,44 +901,79 @@
         });
       }
 
-      async function editProduct(productId) {
+      const productEditDialog = document.getElementById('product-edit-dialog');
+      const productEditForm = document.getElementById('product-edit-form');
+      const productEditMessage = document.getElementById('product-edit-message');
+      let editingProductId = null;
+
+      function editProduct(productId) {
         const row = document.querySelector(`.management-row[data-product-id="${productId}"]`);
         if (!row) return;
-        const currentName = row.dataset.productName || '';
-        const currentCategory = row.dataset.productCategory || 'Other';
-        const currentPrice = row.dataset.productPrice || '0';
-        const currentStock = row.dataset.productStock || '0';
-        const currentImage = row.dataset.productImage || '';
+        editingProductId = productId;
+        productEditForm.elements.name.value = row.dataset.productName || '';
+        productEditForm.elements.category.value = row.dataset.productCategory || 'Other';
+        productEditForm.elements.price.value = row.dataset.productPrice || '0';
+        productEditForm.elements.stock.value = row.dataset.productStock || '0';
+        productEditForm.elements.image_url.value = row.dataset.productImage || '';
+        productEditMessage.textContent = '';
+        productEditDialog.showModal();
+      }
 
-        const name = prompt('Məhsul adı:', currentName);
-        if (name === null) return;
-        const category = prompt('Kateqoriya:', currentCategory);
-        if (category === null) return;
-        const rawPrice = prompt('Qiymət:', currentPrice);
-        if (rawPrice === null) return;
-        const rawStock = prompt('Stok:', currentStock);
-        if (rawStock === null) return;
-        const image_url = prompt('Şəkil URL (istəyə bağlı):', currentImage);
-        if (image_url === null) return;
+      document.getElementById('cancel-product-edit').addEventListener('click', () => {
+        productEditDialog.close();
+      });
 
-        const parsedPrice = parseMoneyInput(rawPrice);
-        const parsedStock = Number(rawStock);
-        if (parsedPrice === null || !Number.isFinite(parsedStock)) {
-          alert('Qiymət və stok düzgün daxil edilməlidir.');
+      productEditForm.addEventListener('submit', async event => {
+        event.preventDefault();
+        if (editingProductId === null) return;
+
+        const name = productEditForm.elements.name.value.trim();
+        const category = productEditForm.elements.category.value.trim() || 'Other';
+        const price = parseMoneyInput(productEditForm.elements.price.value);
+        const stock = Number(productEditForm.elements.stock.value);
+        const image_url = productEditForm.elements.image_url.value.trim() || null;
+        const saveButton = document.getElementById('save-product-edit');
+
+        if (!name || price === null || price < 0 || !Number.isInteger(stock) || stock < 0) {
+          productEditMessage.textContent = t('operations.productEditInvalid');
           return;
         }
 
+        saveButton.disabled = true;
+        saveButton.textContent = t('operations.editSaving');
+        productEditMessage.textContent = '';
         try {
-          const res = await fetch(`/api/products/${productId}`, {
-            method:'PUT',
-            headers:{'Content-Type':'application/json'},
-            body: JSON.stringify({ name: name.trim(), category: (category || 'Other').trim() || 'Other', price: parsedPrice, stock: parsedStock, image_url: image_url.trim() || null })
+          const response = await fetch(`/api/products/${editingProductId}`, {
+            method: 'PUT',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({name, category, price, stock, image_url})
           });
-          const data = await res.json();
-          if(!res.ok) throw new Error(data.message || 'Product update failed.');
+          const result = await response.json();
+          if (!response.ok) throw new Error(result.message || 'Product update failed.');
+          productEditDialog.close();
           location.reload();
-        } catch(e){ alert(e.message); }
-      }
+        } catch (error) {
+          productEditMessage.textContent = error.message;
+        } finally {
+          saveButton.disabled = false;
+          saveButton.textContent = t('operations.saveChanges');
+        }
+      });
+
+      const productManagementSearch = document.getElementById('product-management-search');
+      const productManagementEmpty = document.getElementById('product-management-empty');
+      productManagementSearch.addEventListener('input', () => {
+        const query = productManagementSearch.value.trim().toLocaleLowerCase(currentLang);
+        const rows = Array.from(document.querySelectorAll('#product-management-list .management-row'));
+        let visibleCount = 0;
+        rows.forEach(row => {
+          const name = (row.dataset.productName || '').toLocaleLowerCase(currentLang);
+          const matches = name.includes(query);
+          row.hidden = !matches;
+          if (matches) visibleCount += 1;
+        });
+        productManagementEmpty.hidden = !query || visibleCount > 0;
+      });
 
       document.getElementById('add-product-btn').addEventListener('click', async ()=>{
         const name = document.getElementById('new-product-name').value.trim();

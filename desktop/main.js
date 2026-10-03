@@ -10,6 +10,7 @@ const ICON_PATH = path.join(__dirname, 'assets', 'robo.ico');
 let mainWindow;
 
 app.commandLine.appendSwitch('autoplay-policy', 'no-user-gesture-required');
+app.commandLine.appendSwitch('disable-http-cache');
 
 function isTrustedAppUrl(value) {
   try {
