@@ -137,6 +137,14 @@ Admin PIN-i ilə daxil olduqda `/admin` səhifəsindən Məhsullar, Masalar, Aç
 Yanlış 6 rəqəmli admin PIN-i cəhdləri 3 səhvdən sonra 30 saniyə, sonra 60, 120 və
 artan intervallarla bloklanır.
 
+Admin bölməsindəki **setup.exe endir** düyməsi Windows masaüstü proqramının
+quraşdırıcısını serverdən yükləyir. Lokal mühitdə standart fayl yolu
+`desktop/release/RoBo POS Setup 1.0.0.exe`-dir. `desktop/release/` deploy-a
+daxil edilmədiyi üçün Railway-də quraşdırıcını persistent volume-a yerləşdirin və
+web service Variables-da `DESKTOP_INSTALLER_PATH` dəyişənini həmin faylın tam
+yolu ilə təyin edin (məsələn, `/data/RoBo POS Setup 1.0.0.exe`). Fayl serverdə
+tapılmadıqda endpoint yükləmə uğursuzluğunu açıq şəkildə bildirir.
+
 `DATABASE_URL`, `SECRET_KEY` və PIN-ləri GitHub-a, README-yə və ya source fayllarına yazma. Bu dəyişənlər yalnız Railway Variables bölməsində saxlanmalıdır.
 
 `Procfile` Railway üçün Gunicorn başlanğıc əmrini təqdim edir:

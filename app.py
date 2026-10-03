@@ -28,6 +28,7 @@ from flask import (
     redirect,
     render_template,
     request,
+    send_file,
     session,
     url_for,
 )
@@ -1658,6 +1659,38 @@ def admin_page():
         "admin.html",
         permissions=permissions,
         report_recipients=report_recipients,
+    )
+
+
+@app.route('/admin/download/setup.exe')
+def download_desktop_installer():
+    """Download the Windows desktop installer for administrators."""
+    if session.get("role") != "admin":
+        abort(403)
+
+    configured_path = os.getenv("DESKTOP_INSTALLER_PATH")
+    installer_path = (
+        Path(configured_path)
+        if configured_path
+        else (
+            Path(__file__).resolve().parent
+            / "desktop"
+            / "release"
+            / "RoBo POS Setup 1.0.0.exe"
+        )
+    )
+    if not installer_path.is_file():
+        return jsonify({
+            "success": False,
+            "message": "Setup faylı serverdə tapılmadı. DESKTOP_INSTALLER_PATH parametrini yoxlayın.",
+        }), 404
+
+    return send_file(
+        installer_path,
+        as_attachment=True,
+        download_name="setup.exe",
+        mimetype="application/vnd.microsoft.portable-executable",
+        max_age=0,
     )
 
 
