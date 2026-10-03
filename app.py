@@ -2528,6 +2528,27 @@ def _row_value(row: object, key: str) -> Any:
     raise TypeError("Database row does not support named columns")
 
 
+def _parse_decimal(value):
+    """Accept both dot and comma decimal formats used by different locales."""
+    if value is None or value == "":
+        return 0.0
+    if isinstance(value, (int, float)):
+        return float(value)
+
+    normalized = str(value).strip().replace(" ", "")
+    if not normalized:
+        return 0.0
+    if "," in normalized and "." in normalized:
+        if normalized.rfind(",") > normalized.rfind("."):
+            normalized = normalized.replace(".", "").replace(",", ".")
+        else:
+            normalized = normalized.replace(",", "")
+    elif "," in normalized:
+        normalized = normalized.replace(",", ".")
+
+    return float(normalized)
+
+
 def _create_credit_order(conn, database_url, customer_name, cart):
     """Create an open credit order and deduct sold quantities from stock."""
     total_amount = 0.0
@@ -3450,7 +3471,7 @@ def add_product():
     name = str(data.get('name', '')).strip()
     category = str(data.get('category', 'Other') or 'Other').strip() or 'Other'
     try:
-        price = float(data.get('price', 0))
+        price = _parse_decimal(data.get('price', 0))
     except (TypeError, ValueError):
         return jsonify({'success': False, 'message': 'Invalid price'}), 400
     try:
@@ -3512,7 +3533,7 @@ def update_product(product_id):
     name = str(data.get('name', '')).strip()
     category = str(data.get('category', 'Other') or 'Other').strip() or 'Other'
     try:
-        price = float(data.get('price', 0))
+        price = _parse_decimal(data.get('price', 0))
     except (TypeError, ValueError):
         return jsonify({'success': False, 'message': 'Invalid price'}), 400
     try:

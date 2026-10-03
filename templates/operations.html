@@ -605,6 +605,17 @@
         document.documentElement.lang = currentLang;
       }
 
+      function parseMoneyInput(value) {
+        if (value === null || value === undefined || value === '') return 0;
+        const normalized = String(value).trim().replace(/\s+/g, '');
+        if (!normalized) return 0;
+        const valueWithDot = normalized.includes(',') && normalized.includes('.')
+          ? (normalized.lastIndexOf(',') > normalized.lastIndexOf('.') ? normalized.replace(/\./g, '').replace(',', '.') : normalized.replace(/,/g, ''))
+          : normalized.replace(',', '.');
+        const parsed = Number(valueWithDot);
+        return Number.isFinite(parsed) ? parsed : null;
+      }
+
       function parseHistoryDate(value) {
         if (!value) return null;
         const normalized = String(value).replace(' ', 'T');
@@ -839,18 +850,25 @@
         if (name === null) return;
         const category = prompt('Kateqoriya:', currentCategory);
         if (category === null) return;
-        const price = prompt('Qiymət:', currentPrice);
-        if (price === null) return;
-        const stock = prompt('Stok:', currentStock);
-        if (stock === null) return;
+        const rawPrice = prompt('Qiymət:', currentPrice);
+        if (rawPrice === null) return;
+        const rawStock = prompt('Stok:', currentStock);
+        if (rawStock === null) return;
         const image_url = prompt('Şəkil URL (istəyə bağlı):', currentImage);
         if (image_url === null) return;
+
+        const parsedPrice = parseMoneyInput(rawPrice);
+        const parsedStock = Number(rawStock);
+        if (parsedPrice === null || !Number.isFinite(parsedStock)) {
+          alert('Qiymət və stok düzgün daxil edilməlidir.');
+          return;
+        }
 
         try {
           const res = await fetch(`/api/products/${productId}`, {
             method:'PUT',
             headers:{'Content-Type':'application/json'},
-            body: JSON.stringify({ name: name.trim(), category: (category || 'Other').trim() || 'Other', price: Number(price), stock: Number(stock), image_url: image_url.trim() || null })
+            body: JSON.stringify({ name: name.trim(), category: (category || 'Other').trim() || 'Other', price: parsedPrice, stock: parsedStock, image_url: image_url.trim() || null })
           });
           const data = await res.json();
           if(!res.ok) throw new Error(data.message || 'Product update failed.');
@@ -861,11 +879,15 @@
       document.getElementById('add-product-btn').addEventListener('click', async ()=>{
         const name = document.getElementById('new-product-name').value.trim();
         const category = document.getElementById('new-product-category').value || 'Other';
-        const price = Number(document.getElementById('new-product-price').value || 0);
+        const price = parseMoneyInput(document.getElementById('new-product-price').value || 0);
         const stock = Number(document.getElementById('new-product-stock').value || 0);
         const image_url = document.getElementById('new-product-image').value.trim();
         const msg = document.getElementById('product-msg');
         if(!name){ msg.textContent = t('operations.alert.productRequired'); return; }
+        if (price === null || !Number.isFinite(stock)) {
+          msg.textContent = 'Qiymət və stok düzgün daxil edilməlidir.';
+          return;
+        }
         try {
           const res = await fetch('/add_product', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({name, category, price, stock, image_url})});
           const data = await res.json();
