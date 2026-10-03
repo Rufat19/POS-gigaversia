@@ -216,14 +216,14 @@ html{scroll-behavior:smooth}
 .product-card:nth-child(3n+1){background:linear-gradient(135deg,#1f3a5a,#11273d);}
 .product-card:nth-child(3n+2){background:linear-gradient(135deg,#0a7385,#0f172a);}
 .product-card:nth-child(3n+3){background:linear-gradient(135deg,#2f4a62,#17212d);}
-.product-card-bg{position:absolute;inset:0;background:radial-gradient(circle at 80% 20%, rgba(255,255,255,0.18), transparent 32%), linear-gradient(180deg, rgba(255,255,255,0.07), rgba(0,0,0,0.16));}
-.product-card-bg img{width:100%;height:100%;object-fit:cover;opacity:.72;display:block;}
+.product-card-bg{position:absolute;inset:0;background:radial-gradient(circle at 80% 20%, rgba(255,255,255,0.12), transparent 32%), linear-gradient(180deg, rgba(8,18,30,0.22) 0%, rgba(8,18,30,0.36) 48%, rgba(8,18,30,0.72) 100%);}
+.product-card-bg img{width:100%;height:100%;object-fit:cover;opacity:.66;display:block;}
 .product-price-tag,.product-name-text,.product-meta-row,.product-actions-row{position:relative;z-index:1;}
-.product-price-tag{align-self:flex-start;background:rgba(255,255,255,0.14);-webkit-backdrop-filter:blur(4px);backdrop-filter:blur(4px);padding:6px 8px;border-radius:10px;font-size:0.72rem;font-weight:700;border:1px solid rgba(255,255,255,0.18);}
-.product-name-text{font-size:1.15rem;font-weight:800;line-height:1.2;max-width:80%;margin-top:auto;}
+.product-price-tag{align-self:flex-start;background:rgba(15,23,42,0.62);-webkit-backdrop-filter:blur(4px);backdrop-filter:blur(4px);padding:7px 10px;border-radius:10px;font-size:0.82rem;font-weight:800;border:1px solid rgba(255,255,255,0.34);box-shadow:0 3px 10px rgba(15,23,42,0.16);}
+.product-name-text{font-size:1.2rem;font-weight:850;line-height:1.22;max-width:92%;margin-top:auto;text-shadow:0 2px 8px rgba(0,0,0,0.55);}
 .product-meta-row{display:flex;justify-content:space-between;align-items:center;gap:6px;margin-top:10px;}
-.product-category-pill{display:inline-flex;padding:5px 8px;border-radius:999px;background:rgba(255,255,255,0.12);font-size:0.68rem;font-weight:700;}
-.product-stock-text{font-size:0.72rem;color:rgba(255,255,255,0.82);}
+.product-category-pill{display:inline-flex;min-width:0;max-width:68%;padding:6px 9px;border:1px solid rgba(255,255,255,0.18);border-radius:999px;background:rgba(15,23,42,0.52);font-size:0.78rem;font-weight:750;line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.product-stock-text{flex:0 0 auto;padding:5px 8px;border:1px solid rgba(255,255,255,0.18);border-radius:999px;background:rgba(15,23,42,0.52);font-size:0.82rem;font-weight:750;color:#fff;text-shadow:0 1px 3px rgba(0,0,0,0.4);}
 .product-actions-row{display:flex;align-items:center;gap:8px;margin-top:12px;}
 .qty-input{width:74px;padding:9px 10px;border-radius:12px;border:1px solid rgba(255,255,255,0.18);background:rgba(255,255,255,0.08);color:#fff;font-size:0.82rem;}
 .qty-input::placeholder{color:rgba(255,255,255,0.62);}
