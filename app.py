@@ -181,12 +181,12 @@ def get_db():
         database_url, sqlite_db_path = get_db_config()
         if database_url:
             conn = psycopg2.connect(database_url, cursor_factory=RealDictCursor)
+            conn.autocommit = False
             cursor = conn.cursor()
             try:
                 cursor.execute("SET TIME ZONE 'UTC'")
             finally:
                 cursor.close()
-            conn.autocommit = False
         else:
             conn = sqlite3.connect(sqlite_db_path)
             conn.row_factory = sqlite3.Row
