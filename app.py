@@ -6,7 +6,13 @@ PostgreSQL (via DATABASE_URL).
 """
 
 import os
+import html
+import re
+import smtplib
+import ssl
 import time
+from email.message import EmailMessage
+from email.utils import getaddresses
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 import sqlite3
@@ -25,6 +31,7 @@ from flask import (
     session,
     url_for,
 )
+from click import ClickException
 from psycopg2.extras import RealDictCursor
 from werkzeug.security import check_password_hash, generate_password_hash
 
@@ -32,6 +39,7 @@ load_dotenv()
 
 app = Flask(__name__)
 app.config["JSON_SORT_KEYS"] = False
+BAKU_TIMEZONE = timezone(timedelta(hours=4), name="AZT")
 database_url = os.getenv("DATABASE_URL")
 secret_key = os.getenv("SECRET_KEY")
 seller_pin = os.getenv("SELLER_PIN")
@@ -173,6 +181,11 @@ def get_db():
         database_url, sqlite_db_path = get_db_config()
         if database_url:
             conn = psycopg2.connect(database_url, cursor_factory=RealDictCursor)
+            cursor = conn.cursor()
+            try:
+                cursor.execute("SET TIME ZONE 'UTC'")
+            finally:
+                cursor.close()
             conn.autocommit = False
         else:
             conn = sqlite3.connect(sqlite_db_path)
@@ -221,10 +234,17 @@ def _get_permissions(conn, database_url):
 
 def _feature_for_endpoint(endpoint):
     if endpoint in {"products_page", "checkout"} or endpoint in {
-        "add_product", "update_product", "delete_product"
+        "add_product", "update_product", "delete_product", "archive_all_products"
     }:
         return "products"
-    if endpoint in {"tables_page", "tables_api", "table_products_api", "add_table_items", "close_table"}:
+    if endpoint == "clear_stock_history":
+        return "operations"
+    if endpoint == "clear_debt_history":
+        return "open_orders"
+    if endpoint in {
+        "tables_page", "tables_api", "table_products_api", "add_table_items",
+        "close_table", "table_credit",
+    }:
         return "tables"
     if endpoint in {"open_orders_page", "credit_orders_api", "add_credit_order_items", "pay_credit_order"}:
         return "open_orders"
@@ -258,6 +278,11 @@ def enforce_access():
     if request.endpoint in {None, 'static', 'login_page', 'logout'}:
         return None
     if not session.get('role'):
+        if request.path.startswith("/api/") or request.method != "GET":
+            return jsonify({
+                "success": False,
+                "message": "Daxil olmaq üçün sistemə giriş edin.",
+            }), 401
         return redirect(url_for('login_page'))
 
     role = session.get('role')
@@ -278,6 +303,10 @@ def enforce_access():
         'add_product',
         'update_product',
         'delete_product',
+        'archive_all_products',
+        'clear_stock_history',
+        'clear_sales_history',
+        'clear_debt_history',
         'add_category',
         'rename_category',
         'delete_category',
@@ -452,7 +481,8 @@ def _create_tables_postgres(conn):
                 category VARCHAR(50) DEFAULT 'Other',
                 price NUMERIC(10,2) NOT NULL,
                 stock INT NOT NULL DEFAULT 0,
-                image_url TEXT
+                image_url TEXT,
+                is_active BOOLEAN NOT NULL DEFAULT TRUE
             )
             """
         )
@@ -472,6 +502,9 @@ def _create_tables_postgres(conn):
             )
         except (psycopg2.Error, sqlite3.Error):
             pass
+        cur.execute(
+            "ALTER TABLE products ADD COLUMN IF NOT EXISTS is_active BOOLEAN NOT NULL DEFAULT TRUE"
+        )
 
         cur.execute(
             """
@@ -622,6 +655,14 @@ def _create_tables_postgres(conn):
         )
         cur.execute(
             """
+            CREATE TABLE IF NOT EXISTS app_settings (
+                setting_key VARCHAR(100) PRIMARY KEY,
+                setting_value TEXT NOT NULL
+            )
+            """
+        )
+        cur.execute(
+            """
             CREATE TABLE IF NOT EXISTS users (
                 id SERIAL PRIMARY KEY,
                 username VARCHAR(100) NOT NULL UNIQUE,
@@ -633,21 +674,6 @@ def _create_tables_postgres(conn):
             """
         )
 
-        cur.execute("SELECT name FROM products")
-        existing_names = set()
-        for row in cur.fetchall():
-            if not isinstance(row, tuple) and hasattr(row, "get"):
-                existing_names.add(str(row.get("name", "")))
-            else:
-                existing_names.add(str(row[0]))
-
-        insert_sql = (
-            "INSERT INTO products (name, category, price, stock, image_url) "
-            "VALUES (%s, %s, %s, %s, %s)"
-        )
-        for product in DEFAULT_PRODUCTS:
-            if product[0] not in existing_names:
-                cur.execute(insert_sql, product)
         conn.commit()
     finally:
         cur.close()
@@ -669,7 +695,8 @@ def _create_tables_sqlite(conn):
                 category TEXT DEFAULT 'Other',
                 price REAL NOT NULL,
                 stock INTEGER NOT NULL DEFAULT 0,
-                image_url TEXT
+                image_url TEXT,
+                is_active INTEGER NOT NULL DEFAULT 1
             )
             """
         )
@@ -688,6 +715,8 @@ def _create_tables_sqlite(conn):
                 cur.execute("ALTER TABLE products ADD COLUMN image_url TEXT")
             except sqlite3.Error:
                 pass
+        if 'is_active' not in cols:
+            cur.execute("ALTER TABLE products ADD COLUMN is_active INTEGER NOT NULL DEFAULT 1")
 
         cur.execute(
             """
@@ -850,6 +879,14 @@ def _create_tables_sqlite(conn):
         )
         cur.execute(
             """
+            CREATE TABLE IF NOT EXISTS app_settings (
+                setting_key TEXT PRIMARY KEY,
+                setting_value TEXT NOT NULL
+            )
+            """
+        )
+        cur.execute(
+            """
             CREATE TABLE IF NOT EXISTS users (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 username TEXT NOT NULL UNIQUE,
@@ -860,23 +897,6 @@ def _create_tables_sqlite(conn):
             )
             """
         )
-        cur.execute("SELECT name FROM products")
-        existing_names = set()
-        for row in cur.fetchall():
-            if isinstance(row, sqlite3.Row):
-                existing_names.add(str(row["name"]))
-            elif not isinstance(row, tuple) and hasattr(row, "get"):
-                existing_names.add(str(row.get("name", "")))
-            else:
-                existing_names.add(str(row[0]))
-
-        insert_sql = (
-            "INSERT INTO products (name, category, price, stock, image_url) "
-            "VALUES (?, ?, ?, ?, ?)"
-        )
-        for product in DEFAULT_PRODUCTS:
-            if product[0] not in existing_names:
-                cur.execute(insert_sql, product)
         conn.commit()
     finally:
         cur.close()
@@ -895,7 +915,7 @@ def _sync_categories(conn, database_url):
                 )
                 """
             )
-            cur.execute("SELECT DISTINCT category FROM products WHERE category IS NOT NULL")
+            cur.execute("SELECT DISTINCT category FROM products WHERE category IS NOT NULL AND is_active = TRUE")
             existing = {
                 row["category"] for row in cur.fetchall()
                 if row and row["category"]
@@ -919,7 +939,7 @@ def _sync_categories(conn, database_url):
                 )
                 """
             )
-            cur.execute("SELECT DISTINCT category FROM products WHERE category IS NOT NULL")
+            cur.execute("SELECT DISTINCT category FROM products WHERE category IS NOT NULL AND is_active = 1")
             existing = {row[0] for row in cur.fetchall() if row and row[0]}
             for name in sorted(existing):
                 cur.execute(
@@ -967,7 +987,7 @@ def _get_categories(conn, database_url):
             ]
             if categories:
                 return categories
-            cur.execute("SELECT DISTINCT category FROM products WHERE category IS NOT NULL ORDER BY category")
+            cur.execute("SELECT DISTINCT category FROM products WHERE category IS NOT NULL AND is_active = TRUE ORDER BY category")
             return [
                 row["category"] for row in cur.fetchall()
                 if row and row["category"]
@@ -981,7 +1001,7 @@ def _get_categories(conn, database_url):
         categories = [row[0] for row in cur.fetchall() if row and row[0]]
         if categories:
             return categories
-        cur.execute("SELECT DISTINCT category FROM products WHERE category IS NOT NULL ORDER BY category")
+        cur.execute("SELECT DISTINCT category FROM products WHERE category IS NOT NULL AND is_active = 1 ORDER BY category")
         return [row[0] for row in cur.fetchall() if row and row[0]]
     finally:
         cur.close()
@@ -999,9 +1019,105 @@ def init_db():
         _create_tables_postgres(conn)
     else:
         _create_tables_sqlite(conn)
+    _seed_default_products(conn, database_url)
     _sync_categories(conn, database_url)
     _sync_table_definitions(conn, database_url)
     _sync_default_users(conn, database_url)
+
+
+def _seed_default_products(conn, database_url):
+    """Seed defaults once without restoring renamed or archived products."""
+    cur = conn.cursor()
+    placeholder = "%s" if database_url else "?"
+    try:
+        if database_url:
+            cur.execute(
+                """
+                CREATE TABLE IF NOT EXISTS default_product_seeds (
+                    name VARCHAR(200) PRIMARY KEY
+                )
+                """
+            )
+            cur.execute("LOCK TABLE default_product_seeds IN EXCLUSIVE MODE")
+        else:
+            cur.execute(
+                """
+                CREATE TABLE IF NOT EXISTS default_product_seeds (
+                    name TEXT PRIMARY KEY
+                )
+                """
+            )
+
+        cur.execute("SELECT COUNT(*) AS count FROM products")
+        products_exist = int(_row_value(cur.fetchone(), "count")) > 0
+        cur.execute("SELECT COUNT(*) AS count FROM default_product_seeds")
+        seeds_exist = int(_row_value(cur.fetchone(), "count")) > 0
+
+        if not seeds_exist and products_exist:
+            for product in DEFAULT_PRODUCTS:
+                if database_url:
+                    cur.execute(
+                        "INSERT INTO default_product_seeds (name) VALUES (%s) ON CONFLICT (name) DO NOTHING",
+                        (product[0],),
+                    )
+                else:
+                    cur.execute(
+                        "INSERT OR IGNORE INTO default_product_seeds (name) VALUES (?)",
+                        (product[0],),
+                    )
+        elif not seeds_exist:
+            for product in DEFAULT_PRODUCTS:
+                if database_url:
+                    cur.execute(
+                        "INSERT INTO products (name, category, price, stock, image_url) "
+                        "VALUES (%s, %s, %s, %s, %s)",
+                        product,
+                    )
+                    cur.execute(
+                        "INSERT INTO default_product_seeds (name) VALUES (%s)",
+                        (product[0],),
+                    )
+                else:
+                    cur.execute(
+                        "INSERT INTO products (name, category, price, stock, image_url) "
+                        "VALUES (?, ?, ?, ?, ?)",
+                        product,
+                    )
+                    cur.execute(
+                        "INSERT INTO default_product_seeds (name) VALUES (?)",
+                        (product[0],),
+                    )
+        else:
+            cur.execute("SELECT name FROM default_product_seeds")
+            seeded_names = {
+                str(_row_value(row, "name")) for row in cur.fetchall()
+            }
+            cur.execute("SELECT name FROM products")
+            existing_names = {
+                str(_row_value(row, "name")) for row in cur.fetchall()
+            }
+            for product in DEFAULT_PRODUCTS:
+                if product[0] in seeded_names:
+                    continue
+                if product[0] not in existing_names:
+                    cur.execute(
+                        f"INSERT INTO products (name, category, price, stock, image_url) "
+                        f"VALUES ({placeholder}, {placeholder}, {placeholder}, {placeholder}, {placeholder})",
+                        product,
+                    )
+                if database_url:
+                    cur.execute(
+                        "INSERT INTO default_product_seeds (name) VALUES (%s) ON CONFLICT (name) DO NOTHING",
+                        (product[0],),
+                    )
+                else:
+                    cur.execute(
+                        "INSERT OR IGNORE INTO default_product_seeds (name) VALUES (?)",
+                        (product[0],),
+                    )
+        conn.commit()
+    finally:
+        cur.close()
 
 
 def _sync_default_users(conn, database_url):
@@ -1076,14 +1192,14 @@ def products_page():
     if database_url:
         cur = conn.cursor()
         try:
-            cur.execute("SELECT id, name, category, price, stock, image_url FROM products ORDER BY id")
+            cur.execute("SELECT id, name, category, price, stock, image_url FROM products WHERE is_active = TRUE ORDER BY id")
             products = cur.fetchall()
         finally:
             cur.close()
     else:
         products_sql = (
             "SELECT id, name, category, price, stock, image_url "
-            "FROM products ORDER BY id"
+            "FROM products WHERE is_active = 1 ORDER BY id"
         )
         cur = conn.cursor()
         try:
@@ -1102,7 +1218,7 @@ def operations_page():
     init_db()
     conn = get_db()
     database_url, _ = get_db_config()
-    end = datetime.now(timezone.utc).date()
+    end = datetime.now(BAKU_TIMEZONE).date()
     start = end - timedelta(days=6)
 
     # load products for dropdown
@@ -1111,7 +1227,7 @@ def operations_page():
         try:
             cur.execute(
                 "SELECT id, name, category, price, stock, image_url "
-                "FROM products ORDER BY name"
+                "FROM products WHERE is_active = TRUE ORDER BY name"
             )
             products = cur.fetchall()
         finally:
@@ -1121,7 +1237,7 @@ def operations_page():
         try:
             cur.execute(
                 "SELECT id, name, category, price, stock, image_url "
-                "FROM products ORDER BY name"
+                "FROM products WHERE is_active = 1 ORDER BY name"
             )
             products = cur.fetchall()
         finally:
@@ -1183,8 +1299,8 @@ def sales_history_page():
     init_db()
     conn = get_db()
     database_url, _ = get_db_config()
-    today = datetime.now(timezone.utc).date()
-    default_start = (today - timedelta(days=6)).isoformat()
+    today = datetime.now(BAKU_TIMEZONE).date()
+    default_start = today.isoformat()
     default_end = today.isoformat()
     start_value = request.args.get("start_date", default_start)
     end_value = request.args.get("end_date", default_end)
@@ -1198,7 +1314,14 @@ def sales_history_page():
         abort(400, description="Başlanğıc tarixi bitmə tarixindən sonra ola bilməz.")
 
     placeholder = "%s" if database_url else "?"
-    date_expression = "s.created_at::date" if database_url else "DATE(s.created_at)"
+    local_created_at = (
+        "(s.created_at AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Baku')"
+        if database_url
+        else "datetime(s.created_at, '+4 hours')"
+    )
+    date_expression = (
+        f"{local_created_at}::date" if database_url else f"DATE({local_created_at})"
+    )
     date_conditions = []
     parameters = []
     if start_date:
@@ -1213,7 +1336,7 @@ def sales_history_page():
     try:
         cur.execute(
             f"""
-            SELECT s.created_at AS created_at,
+            SELECT {local_created_at} AS created_at,
                    p.name AS product_name,
                    si.quantity AS quantity,
                    (si.unit_price * si.quantity) AS amount
@@ -1243,15 +1366,19 @@ def sales_history_page():
 def _query_reports_postgres(conn, start_date, end_date):
     cur = conn.cursor()
     try:
+        local_created_at = (
+            "(s.created_at AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Baku')"
+        )
+        local_created_date = f"{local_created_at}::date"
         cur.execute(
-            """
+            f"""
             SELECT p.id,
                    p.name,
                    SUM(si.quantity) AS total_qty
             FROM sale_items si
             JOIN sales s ON si.sale_id = s.id
             JOIN products p ON si.product_id = p.id
-            WHERE s.status = 'completed' AND s.created_at::date BETWEEN %s AND %s
+            WHERE s.status = 'completed' AND {local_created_date} BETWEEN %s AND %s
             GROUP BY p.id, p.name
             ORDER BY total_qty DESC
             """,
@@ -1260,13 +1387,13 @@ def _query_reports_postgres(conn, start_date, end_date):
         prod_totals = cur.fetchall()
 
         cur.execute(
-            """
+            f"""
             SELECT p.category,
                    SUM(si.quantity * si.unit_price) AS total_amount
             FROM sale_items si
             JOIN sales s ON si.sale_id = s.id
             JOIN products p ON si.product_id = p.id
-            WHERE s.status = 'completed' AND s.created_at::date BETWEEN %s AND %s
+            WHERE s.status = 'completed' AND {local_created_date} BETWEEN %s AND %s
             GROUP BY p.category
             ORDER BY total_amount DESC
             """,
@@ -1275,12 +1402,12 @@ def _query_reports_postgres(conn, start_date, end_date):
         cat_break = cur.fetchall()
 
         cur.execute(
-            """
-            SELECT DATE_TRUNC('day', s.created_at) AS day,
+            f"""
+            SELECT DATE_TRUNC('day', {local_created_at}) AS day,
                    SUM(si.quantity * si.unit_price) AS total
             FROM sale_items si
             JOIN sales s ON si.sale_id = s.id
-            WHERE s.status = 'completed' AND s.created_at::date BETWEEN %s AND %s
+            WHERE s.status = 'completed' AND {local_created_date} BETWEEN %s AND %s
             GROUP BY day
             ORDER BY day ASC
             """,
@@ -1289,12 +1416,12 @@ def _query_reports_postgres(conn, start_date, end_date):
         daily = cur.fetchall()
 
         cur.execute(
-            """
+            f"""
             SELECT p.name, SUM(si.quantity) AS total_qty
             FROM sale_items si
             JOIN sales s ON si.sale_id = s.id
             JOIN products p ON si.product_id = p.id
-            WHERE s.status = 'completed' AND s.created_at::date BETWEEN %s AND %s
+            WHERE s.status = 'completed' AND {local_created_date} BETWEEN %s AND %s
             GROUP BY p.name
             ORDER BY total_qty DESC
             LIMIT 5
@@ -1311,13 +1438,15 @@ def _query_reports_postgres(conn, start_date, end_date):
 def _query_reports_sqlite(conn, start_date, end_date):
     cur = conn.cursor()
     try:
+        local_created_at = "datetime(s.created_at, '+4 hours')"
+        local_created_date = f"DATE({local_created_at})"
         cur.execute(
-            """
+            f"""
             SELECT p.id, p.name, SUM(si.quantity) AS total_qty
             FROM sale_items si
             JOIN sales s ON si.sale_id = s.id
             JOIN products p ON si.product_id = p.id
-            WHERE s.status = 'completed' AND DATE(s.created_at) BETWEEN ? AND ?
+            WHERE s.status = 'completed' AND {local_created_date} BETWEEN ? AND ?
             GROUP BY p.id, p.name
             ORDER BY total_qty DESC
             """,
@@ -1326,12 +1455,12 @@ def _query_reports_sqlite(conn, start_date, end_date):
         prod_totals = cur.fetchall()
 
         cur.execute(
-            """
+            f"""
             SELECT p.category, SUM(si.quantity * si.unit_price) AS total_amount
             FROM sale_items si
             JOIN sales s ON si.sale_id = s.id
             JOIN products p ON si.product_id = p.id
-            WHERE DATE(s.created_at) BETWEEN ? AND ?
+            WHERE {local_created_date} BETWEEN ? AND ?
             GROUP BY p.category
             ORDER BY total_amount DESC
             """,
@@ -1340,12 +1469,12 @@ def _query_reports_sqlite(conn, start_date, end_date):
         cat_break = cur.fetchall()
 
         cur.execute(
-            """
-            SELECT DATE(s.created_at) AS day,
+            f"""
+            SELECT {local_created_date} AS day,
                    SUM(si.quantity * si.unit_price) AS total
             FROM sale_items si
             JOIN sales s ON si.sale_id = s.id
-            WHERE DATE(s.created_at) BETWEEN ? AND ?
+            WHERE {local_created_date} BETWEEN ? AND ?
             GROUP BY day
             ORDER BY day ASC
             """,
@@ -1354,12 +1483,12 @@ def _query_reports_sqlite(conn, start_date, end_date):
         daily = cur.fetchall()
 
         cur.execute(
-            """
+            f"""
             SELECT p.name, SUM(si.quantity) AS total_qty
             FROM sale_items si
             JOIN sales s ON si.sale_id = s.id
             JOIN products p ON si.product_id = p.id
-            WHERE DATE(s.created_at) BETWEEN ? AND ?
+            WHERE {local_created_date} BETWEEN ? AND ?
             GROUP BY p.name
             ORDER BY total_qty DESC
             LIMIT 5
@@ -1454,7 +1583,8 @@ def _process_stock_movement_common(conn, placeholder, movement):
     quantity = movement['quantity']
     note = movement['note']
 
-    select_sql = f'SELECT stock, name FROM products WHERE id = {placeholder}'
+    active_value = "TRUE" if placeholder == "%s" else "1"
+    select_sql = f'SELECT stock, name FROM products WHERE id = {placeholder} AND is_active = {active_value}'
     insert_sql = (
         f'INSERT INTO stock_movements (product_id, type, quantity, note) '
         f'VALUES ({placeholder}, {placeholder}, {placeholder}, {placeholder})'
@@ -1503,7 +1633,7 @@ def _process_stock_movement_common(conn, placeholder, movement):
 @app.route('/reports')
 def reports_page():
     """Render the reports page with default last-30-days values."""
-    end = datetime.utcnow().date()
+    end = datetime.now(BAKU_TIMEZONE).date()
     start = end - timedelta(days=29)
     return render_template(
         'reports.html',
@@ -1519,8 +1649,16 @@ def admin_page():
         return abort(403)
     init_db()
     database_url, _ = get_db_config()
-    permissions = _get_permissions(get_db(), database_url)
-    return render_template("admin.html", permissions=permissions)
+    conn = get_db()
+    permissions = _get_permissions(conn, database_url)
+    report_recipients = _get_app_setting(
+        conn, database_url, "daily_report_recipients"
+    )
+    return render_template(
+        "admin.html",
+        permissions=permissions,
+        report_recipients=report_recipients,
+    )
 
 
 @app.route('/api/admin/permissions', methods=['POST'])
@@ -1569,6 +1707,352 @@ def _require_admin():
     if session.get("role") != "admin":
         return jsonify({"success": False, "message": "Yalnız admin bu əməliyyatı edə bilər."}), 403
     return None
+
+
+def _get_app_setting(conn, database_url, key, default=""):
+    cur = conn.cursor()
+    try:
+        placeholder = "%s" if database_url else "?"
+        cur.execute(
+            f"SELECT setting_value FROM app_settings WHERE setting_key = {placeholder}",
+            (key,),
+        )
+        row = cur.fetchone()
+        return str(_row_value(row, "setting_value")) if row else default
+    finally:
+        cur.close()
+
+
+def _set_app_setting(conn, database_url, key, value):
+    cur = conn.cursor()
+    try:
+        if database_url:
+            cur.execute(
+                """
+                INSERT INTO app_settings (setting_key, setting_value)
+                VALUES (%s, %s)
+                ON CONFLICT (setting_key) DO UPDATE
+                SET setting_value = EXCLUDED.setting_value
+                """,
+                (key, value),
+            )
+        else:
+            cur.execute(
+                """
+                INSERT INTO app_settings (setting_key, setting_value)
+                VALUES (?, ?)
+                ON CONFLICT (setting_key) DO UPDATE
+                SET setting_value = excluded.setting_value
+                """,
+                (key, value),
+            )
+    finally:
+        cur.close()
+
+
+def _parse_email_recipients(raw_value):
+    addresses = [
+        address
+        for _, address in getaddresses([raw_value.replace(";", ",")])
+        if address
+    ]
+    if len(raw_value) > 2000:
+        raise ValueError("E-poçt ünvanları çox uzundur.")
+    if any(not re.fullmatch(r"[^@\s]+@[^@\s]+\.[^@\s]+", address) for address in addresses):
+        raise ValueError("E-poçt ünvanlarından biri düzgün deyil.")
+    return list(dict.fromkeys(addresses))
+
+
+def _smtp_configuration():
+    host = os.getenv("SMTP_HOST", "").strip()
+    sender = os.getenv("SMTP_FROM", "").strip() or os.getenv("SMTP_USERNAME", "").strip()
+    username = os.getenv("SMTP_USERNAME", "").strip()
+    password = os.getenv("SMTP_PASSWORD", "")
+    if not host or not sender:
+        raise RuntimeError("SMTP_HOST və SMTP_FROM (və ya SMTP_USERNAME) dəyişənlərini təyin edin.")
+    if bool(username) != bool(password):
+        raise RuntimeError("SMTP_USERNAME və SMTP_PASSWORD birlikdə təyin olunmalıdır.")
+    try:
+        port = int(os.getenv("SMTP_PORT", "587"))
+        timeout = int(os.getenv("SMTP_TIMEOUT", "20"))
+    except ValueError as exc:
+        raise RuntimeError("SMTP_PORT və SMTP_TIMEOUT tam ədəd olmalıdır.") from exc
+    use_ssl = os.getenv("SMTP_USE_SSL", "false").strip().lower() in {"1", "true", "yes"}
+    use_tls = os.getenv("SMTP_USE_TLS", "true").strip().lower() in {"1", "true", "yes"}
+    if use_ssl and use_tls:
+        raise RuntimeError("SMTP_USE_SSL və SMTP_USE_TLS eyni vaxtda aktiv ola bilməz.")
+    if not 1 <= port <= 65535 or timeout <= 0:
+        raise RuntimeError("SMTP portu və timeout dəyəri düzgün deyil.")
+    return {
+        "host": host,
+        "port": port,
+        "sender": sender,
+        "username": username,
+        "password": password,
+        "timeout": timeout,
+        "use_ssl": use_ssl,
+        "use_tls": use_tls,
+    }
+
+
+def _send_email(recipients, subject, text_body, html_body):
+    config = _smtp_configuration()
+    message = EmailMessage()
+    message["Subject"] = subject
+    message["From"] = config["sender"]
+    message["To"] = ", ".join(recipients)
+    message.set_content(text_body)
+    message.add_alternative(html_body, subtype="html")
+    context = ssl.create_default_context()
+    smtp_class = smtplib.SMTP_SSL if config["use_ssl"] else smtplib.SMTP
+    smtp_kwargs = {"timeout": config["timeout"]}
+    if config["use_ssl"]:
+        smtp_kwargs["context"] = context
+    with smtp_class(config["host"], config["port"], **smtp_kwargs) as smtp:
+        if config["use_tls"]:
+            smtp.starttls(context=context)
+        if config["username"]:
+            smtp.login(config["username"], config["password"])
+        smtp.send_message(message)
+
+
+def _build_daily_email_report(conn, database_url, report_date):
+    placeholder = "%s" if database_url else "?"
+    local_created_at = (
+        "(created_at AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Baku')"
+        if database_url
+        else "datetime(created_at, '+4 hours')"
+    )
+    local_sales_date = (
+        f"(s.created_at AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Baku')::date"
+        if database_url
+        else "DATE(datetime(s.created_at, '+4 hours'))"
+    )
+    local_credit_date = (
+        f"(created_at AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Baku')::date"
+        if database_url
+        else "DATE(datetime(created_at, '+4 hours'))"
+    )
+    cur = conn.cursor()
+    try:
+        cur.execute(
+            f"""
+            SELECT COUNT(*) AS sale_count,
+                   COALESCE(SUM(total_amount), 0) AS sales_total
+            FROM sales s
+            WHERE s.status = 'completed' AND {local_sales_date} = {placeholder}
+            """,
+            (report_date.isoformat(),),
+        )
+        sales_summary = cur.fetchone()
+        cur.execute(
+            f"""
+            SELECT p.name AS product_name,
+                   SUM(si.quantity) AS quantity,
+                   SUM(si.quantity * si.unit_price) AS amount
+            FROM sale_items si
+            JOIN sales s ON s.id = si.sale_id
+            JOIN products p ON p.id = si.product_id
+            WHERE s.status = 'completed' AND {local_sales_date} = {placeholder}
+            GROUP BY p.name
+            ORDER BY amount DESC, p.name
+            """,
+            (report_date.isoformat(),),
+        )
+        sold_products = cur.fetchall()
+        cur.execute(
+            f"""
+            SELECT customer_name, total_amount, status, {local_created_at} AS local_created_at
+            FROM credit_orders
+            WHERE {local_credit_date} = {placeholder}
+            ORDER BY created_at, id
+            """,
+            (report_date.isoformat(),),
+        )
+        debts = cur.fetchall()
+        cur.execute(
+            """
+            SELECT name, category, stock
+            FROM products
+            WHERE is_active = TRUE
+            ORDER BY stock ASC, name
+            """
+            if database_url
+            else """
+            SELECT name, category, stock
+            FROM products
+            WHERE is_active = 1
+            ORDER BY stock ASC, name
+            """
+        )
+        stock = cur.fetchall()
+    finally:
+        cur.close()
+
+    sale_count = int(_row_value(sales_summary, "sale_count") or 0)
+    sales_total = float(_row_value(sales_summary, "sales_total") or 0)
+    total_debt = sum(float(_row_value(order, "total_amount") or 0) for order in debts)
+    date_label = report_date.strftime("%d.%m.%Y")
+    text_lines = [
+        f"Gündəlik hesabat — {date_label} (Bakı vaxtı)",
+        "",
+        f"Satış: {sale_count} satış, {sales_total:.2f} AZN",
+        "Satılan məhsullar:",
+    ]
+    if sold_products:
+        text_lines.extend(
+            f"- {_row_value(item, 'product_name')}: {_row_value(item, 'quantity')} ədəd, "
+            f"{float(_row_value(item, 'amount') or 0):.2f} AZN"
+            for item in sold_products
+        )
+    else:
+        text_lines.append("- Satış olmayıb")
+    text_lines.extend(["", "Yeni borclar:"])
+    if debts:
+        text_lines.extend(
+            f"- {_row_value(order, 'customer_name')}: "
+            f"{float(_row_value(order, 'total_amount') or 0):.2f} AZN "
+            f"({_row_value(order, 'status')})"
+            for order in debts
+        )
+    else:
+        text_lines.append("- Yeni borc yoxdur")
+    text_lines.extend(["", "Aktiv məhsulların stok qalığı:"])
+    if stock:
+        text_lines.extend(
+            f"- {_row_value(product, 'name')} ({_row_value(product, 'category')}): "
+            f"{_row_value(product, 'stock')}"
+            for product in stock
+        )
+    else:
+        text_lines.append("- Aktiv məhsul yoxdur")
+    text_lines.extend(["", f"Yeni borcların ümumi məbləği: {total_debt:.2f} AZN"])
+    text_body = "\n".join(text_lines)
+
+    def escaped(value):
+        return html.escape(str(value), quote=True)
+
+    sold_rows = "".join(
+        f"<tr><td>{escaped(_row_value(item, 'product_name'))}</td>"
+        f"<td>{escaped(_row_value(item, 'quantity'))}</td>"
+        f"<td>{float(_row_value(item, 'amount') or 0):.2f} AZN</td></tr>"
+        for item in sold_products
+    ) or '<tr><td colspan="3">Satış olmayıb</td></tr>'
+    debt_rows = "".join(
+        f"<tr><td>{escaped(_row_value(order, 'customer_name'))}</td>"
+        f"<td>{escaped(_row_value(order, 'status'))}</td>"
+        f"<td>{float(_row_value(order, 'total_amount') or 0):.2f} AZN</td></tr>"
+        for order in debts
+    ) or '<tr><td colspan="3">Yeni borc yoxdur</td></tr>'
+    stock_rows = "".join(
+        f"<tr><td>{escaped(_row_value(product, 'name'))}</td>"
+        f"<td>{escaped(_row_value(product, 'category'))}</td>"
+        f"<td>{escaped(_row_value(product, 'stock'))}</td></tr>"
+        for product in stock
+    ) or '<tr><td colspan="3">Aktiv məhsul yoxdur</td></tr>'
+    table_style = "border-collapse:collapse;width:100%;margin:12px 0 24px"
+    cell_style = "border:1px solid #d9e1ea;padding:9px;text-align:left"
+    html_body = f"""
+    <!doctype html><html><body style="margin:0;background:#f3f6fa;font-family:Arial,sans-serif;color:#1f2937">
+      <main style="max-width:760px;margin:24px auto;padding:24px;background:#fff;border-radius:12px">
+        <h1 style="margin:0 0 6px;color:#17324d">Gündəlik hesabat</h1>
+        <p style="margin:0 0 22px;color:#64748b">{date_label} · Bakı vaxtı</p>
+        <div style="padding:16px;background:#eff6ff;border-radius:8px">
+          <strong>Satış: {sale_count} satış · {sales_total:.2f} AZN</strong><br>
+          Yeni borclar: {len(debts)} · {total_debt:.2f} AZN
+        </div>
+        <h2>Satılan məhsullar</h2>
+        <table style="{table_style}"><thead><tr>
+          <th style="{cell_style}">Məhsul</th><th style="{cell_style}">Miqdar</th><th style="{cell_style}">Məbləğ</th>
+        </tr></thead><tbody>{sold_rows}</tbody></table>
+        <h2>Yeni borclar</h2>
+        <table style="{table_style}"><thead><tr>
+          <th style="{cell_style}">Müştəri</th><th style="{cell_style}">Status</th><th style="{cell_style}">Məbləğ</th>
+        </tr></thead><tbody>{debt_rows}</tbody></table>
+        <h2>Aktiv məhsulların stok qalığı</h2>
+        <table style="{table_style}"><thead><tr>
+          <th style="{cell_style}">Məhsul</th><th style="{cell_style}">Kateqoriya</th><th style="{cell_style}">Qalıq</th>
+        </tr></thead><tbody>{stock_rows}</tbody></table>
+      </main>
+    </body></html>
+    """
+    return {
+        "subject": f"Gündəlik satış və stok hesabatı — {date_label}",
+        "text": text_body,
+        "html": html_body,
+        "sale_count": sale_count,
+        "sales_total": sales_total,
+        "debt_count": len(debts),
+        "debt_total": total_debt,
+        "stock_count": len(stock),
+    }
+
+
+@app.route("/api/admin/daily-report", methods=["POST"])
+def update_daily_report_settings():
+    denied = _require_admin()
+    if denied:
+        return denied
+    init_db()
+    data = request.get_json(silent=True) or {}
+    raw_recipients = str(data.get("recipients", "")).strip()
+    try:
+        recipients = _parse_email_recipients(raw_recipients)
+    except ValueError as exc:
+        return jsonify({"success": False, "message": str(exc)}), 400
+    normalized = ", ".join(recipients)
+    conn = get_db()
+    database_url, _ = get_db_config()
+    try:
+        _set_app_setting(conn, database_url, "daily_report_recipients", normalized)
+        _audit_event(
+            conn,
+            database_url,
+            "daily_report_recipients_updated",
+            "app_settings",
+            details=f"recipient_count={len(recipients)}",
+        )
+        conn.commit()
+        return jsonify({
+            "success": True,
+            "recipients": normalized,
+            "message": "Hesabat alıcıları yadda saxlanıldı.",
+        })
+    except (sqlite3.Error, psycopg2.Error) as exc:
+        conn.rollback()
+        return jsonify({"success": False, "message": f"Ayar yadda saxlanmadı: {exc}"}), 500
+
+
+@app.route("/api/admin/daily-report/test", methods=["POST"])
+def send_daily_report_test():
+    denied = _require_admin()
+    if denied:
+        return denied
+    init_db()
+    conn = get_db()
+    database_url, _ = get_db_config()
+    try:
+        recipients = _parse_email_recipients(
+            _get_app_setting(conn, database_url, "daily_report_recipients")
+        )
+        if not recipients:
+            return jsonify({"success": False, "message": "Əvvəlcə ən azı bir alıcı e-poçtu qeyd edin."}), 400
+        report_date = datetime.now(BAKU_TIMEZONE).date()
+        _send_email(
+            recipients,
+            f"Test: gündəlik hesabat — {report_date.strftime('%d.%m.%Y')}",
+            "Bu test məktubudur. Gündəlik hesabat e-poçt göndərişi işləyir.",
+            "<p>Bu test məktubudur. <strong>Gündəlik hesabat e-poçt göndərişi işləyir.</strong></p>",
+        )
+        _audit_event(conn, database_url, "daily_report_test_sent", "app_settings")
+        conn.commit()
+        return jsonify({"success": True, "message": "Test məktubu göndərildi."})
+    except (RuntimeError, smtplib.SMTPException, OSError, ValueError) as exc:
+        conn.rollback()
+        return jsonify({"success": False, "message": f"E-poçt göndərilmədi: {exc}"}), 502
+    except (sqlite3.Error, psycopg2.Error) as exc:
+        conn.rollback()
+        return jsonify({"success": False, "message": f"E-poçt ayarı oxunmadı: {exc}"}), 500
 
 
 @app.route('/api/admin/users', methods=['GET', 'POST'])
@@ -1839,7 +2323,7 @@ def _checkout_postgres(conn, cart):
                 raise ValueError("Yanlış məhsul məlumatı")
 
             cur.execute(
-                "SELECT id, name, price, stock FROM products WHERE id = %s",
+                "SELECT id, name, price, stock FROM products WHERE id = %s AND is_active = TRUE",
                 (product_id,),
             )
             product = cur.fetchone()
@@ -1855,7 +2339,7 @@ def _checkout_postgres(conn, cart):
         sale_id = sale["id"]
 
         # insert items and update stock
-        select_price_sql = "SELECT id, price FROM products WHERE id = %s"
+        select_price_sql = "SELECT id, price FROM products WHERE id = %s AND is_active = TRUE"
         insert_item_sql = (
             "INSERT INTO sale_items (sale_id, product_id, quantity, unit_price) "
             "VALUES (%s, %s, %s, %s)"
@@ -1891,7 +2375,7 @@ def _checkout_sqlite(conn, cart):
 
         select_sql = (
             "SELECT id, name, price, stock FROM products "
-            "WHERE id = ?"
+            "WHERE id = ? AND is_active = 1"
         )
         product = conn.execute(select_sql, (product_id,)).fetchone()
         if product is None:
@@ -1904,7 +2388,7 @@ def _checkout_sqlite(conn, cart):
     cursor.execute(insert_sale_sql, (round(total_amount, 2),))
     sale_id = cursor.lastrowid
 
-    select_price_sql = "SELECT id, price FROM products WHERE id = ?"
+    select_price_sql = "SELECT id, price FROM products WHERE id = ? AND is_active = 1"
     insert_item_sql = (
         "INSERT INTO sale_items (sale_id, product_id, quantity, unit_price) "
         "VALUES (?, ?, ?, ?)"
@@ -2057,7 +2541,7 @@ def _create_credit_order(conn, database_url, customer_name, cart):
                 if not isinstance(product_id, int) or not isinstance(quantity, int) or quantity < 1:
                     raise ValueError("Yanlış məhsul məlumatı")
                 cur.execute(
-                    "SELECT id, name, price, stock FROM products WHERE id = %s FOR UPDATE",
+                    "SELECT id, name, price, stock FROM products WHERE id = %s AND is_active = TRUE FOR UPDATE",
                     (product_id,),
                 )
                 product = cur.fetchone()
@@ -2095,7 +2579,7 @@ def _create_credit_order(conn, database_url, customer_name, cart):
         if not isinstance(product_id, int) or not isinstance(quantity, int) or quantity < 1:
             raise ValueError("Yanlış məhsul məlumatı")
         product = conn.execute(
-            "SELECT id, name, price, stock FROM products WHERE id = ?",
+            "SELECT id, name, price, stock FROM products WHERE id = ? AND is_active = 1",
             (product_id,),
         ).fetchone()
         if product is None:
@@ -2225,7 +2709,7 @@ def table_products_api():
     conn = get_db()
     cur = conn.cursor()
     try:
-        cur.execute("SELECT id, name, category, price, stock FROM products ORDER BY name")
+        cur.execute("SELECT id, name, category, price, stock FROM products WHERE is_active = TRUE ORDER BY name")
         products = cur.fetchall()
         return jsonify(
             {
@@ -2293,7 +2777,7 @@ def add_table_items(table_number):
             if not isinstance(product_id, int) or not isinstance(quantity, int) or quantity < 1:
                 raise ValueError("Yanlış məhsul məlumatı.")
             cur.execute(
-                f"SELECT id, price, stock FROM products WHERE id = {placeholder}",
+                f"SELECT id, price, stock FROM products WHERE id = {placeholder} AND is_active = {'TRUE' if database_url else '1'}",
                 (product_id,),
             )
             product = cur.fetchone()
@@ -2385,6 +2869,108 @@ def close_table(table_number):
     except (sqlite3.Error, psycopg2.Error) as exc:
         conn.rollback()
         return jsonify({"success": False, "message": f"Hesab bağlanarkən xəta: {exc}"}), 500
+    finally:
+        cur.close()
+
+
+@app.route("/api/tables/<int:table_number>/credit", methods=["POST"])
+def table_credit(table_number):
+    """Move an open table bill to open credit orders without deducting stock again."""
+    data = request.get_json(silent=True) or {}
+    customer_name = str(data.get("customer_name", "")).strip()
+    if not customer_name:
+        return jsonify({"success": False, "message": "Borc kimə yazılsın? Ad vacibdir."}), 400
+    if len(customer_name) > 200:
+        return jsonify({"success": False, "message": "Ad çox uzundur."}), 400
+
+    init_db()
+    conn = get_db()
+    database_url, _ = get_db_config()
+    permissions = _get_permissions(conn, database_url)
+    if session.get("role") != "admin" and not permissions.get("open_orders", True):
+        return jsonify({
+            "success": False,
+            "message": "Açıq qalanlar bölməsi admin tərəfindən bloklanıb.",
+        }), 403
+
+    placeholder = "%s" if database_url else "?"
+    cur = conn.cursor()
+    try:
+        cur.execute(
+            f"""
+            SELECT id FROM table_orders
+            WHERE table_number = {placeholder} AND status = 'open'
+            ORDER BY id DESC LIMIT 1
+            """ + (" FOR UPDATE" if database_url else ""),
+            (table_number,),
+        )
+        order = cur.fetchone()
+        if not order:
+            return jsonify({"success": False, "message": "Bu masa boşdur."}), 400
+
+        order_id = _row_value(order, "id")
+        items = _table_order_items(conn, database_url, order_id)
+        if not items:
+            return jsonify({"success": False, "message": "Masada məhsul yoxdur."}), 400
+
+        total = round(sum(float(_row_value(item, "line_total")) for item in items), 2)
+        if database_url:
+            cur.execute(
+                "INSERT INTO credit_orders (customer_name, total_amount) VALUES (%s, %s) RETURNING id",
+                (customer_name, total),
+            )
+            credit_order_id = cur.fetchone()["id"]
+        else:
+            cur.execute(
+                "INSERT INTO credit_orders (customer_name, total_amount) VALUES (?, ?)",
+                (customer_name, total),
+            )
+            credit_order_id = cur.lastrowid
+
+        for item in items:
+            values = (
+                credit_order_id,
+                _row_value(item, "product_id"),
+                _row_value(item, "quantity"),
+                _row_value(item, "unit_price"),
+            )
+            cur.execute(
+                """
+                INSERT INTO credit_order_items
+                    (credit_order_id, product_id, quantity, unit_price)
+                VALUES (%s, %s, %s, %s)
+                """ if database_url else """
+                INSERT INTO credit_order_items
+                    (credit_order_id, product_id, quantity, unit_price)
+                VALUES (?, ?, ?, ?)
+                """,
+                values,
+            )
+
+        cur.execute(
+            f"""
+            UPDATE table_orders
+            SET status = 'closed', closed_at = CURRENT_TIMESTAMP
+            WHERE id = {placeholder} AND status = 'open'
+            """,
+            (order_id,),
+        )
+        if cur.rowcount != 1:
+            raise ValueError("Masa sifarişi artıq dəyişdirilib.")
+
+        conn.commit()
+        return jsonify({
+            "success": True,
+            "id": credit_order_id,
+            "total": total,
+            "message": "Masa borc kimi Açıq qalanlara köçürüldü.",
+        })
+    except ValueError as exc:
+        conn.rollback()
+        return jsonify({"success": False, "message": str(exc)}), 409
+    except (sqlite3.Error, psycopg2.Error) as exc:
+        conn.rollback()
+        return jsonify({"success": False, "message": f"Masa borca keçirilərkən xəta: {exc}"}), 500
     finally:
         cur.close()
 
@@ -2651,13 +3237,13 @@ def add_credit_order_items(order_id):
                 raise ValueError("Yanlış məhsul məlumatı")
             if database_url:
                 cur.execute(
-                    "SELECT id, name, price, stock FROM products WHERE id = %s FOR UPDATE",
+                    "SELECT id, name, price, stock FROM products WHERE id = %s AND is_active = TRUE FOR UPDATE",
                     (product_id,),
                 )
                 product = cur.fetchone()
             else:
                 cur.execute(
-                    "SELECT id, name, price, stock FROM products WHERE id = ?",
+                    "SELECT id, name, price, stock FROM products WHERE id = ? AND is_active = 1",
                     (product_id,),
                 )
                 product = cur.fetchone()
@@ -2785,6 +3371,53 @@ def pay_credit_order(order_id):
                 """,
                 (new_paid_amount, new_paid_amount, new_paid_amount, order_id),
             )
+        sale_id = None
+        if is_paid:
+            if database_url:
+                cur.execute(
+                    "INSERT INTO sales (total_amount) VALUES (%s) RETURNING id",
+                    (total_amount,),
+                )
+                sale_id = cur.fetchone()["id"]
+            else:
+                cur.execute("INSERT INTO sales (total_amount) VALUES (?)", (total_amount,))
+                sale_id = cur.lastrowid
+
+            for item in _credit_order_items(conn, database_url, order_id):
+                if database_url:
+                    cur.execute(
+                        """
+                        INSERT INTO sale_items (sale_id, product_id, quantity, unit_price)
+                        VALUES (%s, %s, %s, %s)
+                        """,
+                        (
+                            sale_id,
+                            _row_value(item, "product_id"),
+                            _row_value(item, "quantity"),
+                            _row_value(item, "unit_price"),
+                        ),
+                    )
+                else:
+                    cur.execute(
+                        """
+                        INSERT INTO sale_items (sale_id, product_id, quantity, unit_price)
+                        VALUES (?, ?, ?, ?)
+                        """,
+                        (
+                            sale_id,
+                            _row_value(item, "product_id"),
+                            _row_value(item, "quantity"),
+                            _row_value(item, "unit_price"),
+                        ),
+                    )
+            _audit_event(
+                conn,
+                database_url,
+                "sale_completed",
+                "sale",
+                sale_id,
+                f"credit_order={order_id}",
+            )
         conn.commit()
         return jsonify(
             {
@@ -2793,6 +3426,7 @@ def pay_credit_order(order_id):
                 "paid_amount": new_paid_amount,
                 "remaining_amount": round(total_amount - new_paid_amount, 2),
                 "status": "paid" if is_paid else "open",
+                "sale_id": sale_id,
             }
         )
     except ValueError as exc:
@@ -2896,7 +3530,7 @@ def update_product(product_id):
             cur = conn.cursor()
             try:
                 cur.execute(
-                    "UPDATE products SET name = %s, category = %s, price = %s, stock = %s, image_url = %s WHERE id = %s",
+                    "UPDATE products SET name = %s, category = %s, price = %s, stock = %s, image_url = %s WHERE id = %s AND is_active = TRUE",
                     (name, category, price, stock, image_url, product_id),
                 )
                 if cur.rowcount == 0:
@@ -2911,7 +3545,7 @@ def update_product(product_id):
             cur = conn.cursor()
             try:
                 cur.execute(
-                    "UPDATE products SET name = ?, category = ?, price = ?, stock = ?, image_url = ? WHERE id = ?",
+                    "UPDATE products SET name = ?, category = ?, price = ?, stock = ?, image_url = ? WHERE id = ? AND is_active = 1",
                     (name, category, price, stock, image_url, product_id),
                 )
                 if cur.rowcount == 0:
@@ -2929,16 +3563,17 @@ def update_product(product_id):
 
 @app.route('/api/products/<int:product_id>', methods=['DELETE'])
 def delete_product(product_id):
-    """Delete a product and any related stock/sale records."""
+    """Archive a product while preserving its historical references."""
     conn = get_db()
     database_url, _ = get_db_config()
     try:
         if database_url:
             cur = conn.cursor()
             try:
-                cur.execute("DELETE FROM sale_items WHERE product_id = %s", (product_id,))
-                cur.execute("DELETE FROM stock_movements WHERE product_id = %s", (product_id,))
-                cur.execute("DELETE FROM products WHERE id = %s", (product_id,))
+                cur.execute(
+                    "UPDATE products SET is_active = FALSE WHERE id = %s AND is_active = TRUE",
+                    (product_id,),
+                )
                 if cur.rowcount == 0:
                     return jsonify({'success': False, 'message': 'Məhsul tapılmadı'}), 404
                 _audit_event(conn, database_url, "product_deleted", "product", product_id)
@@ -2949,9 +3584,10 @@ def delete_product(product_id):
         else:
             cur = conn.cursor()
             try:
-                cur.execute("DELETE FROM sale_items WHERE product_id = ?", (product_id,))
-                cur.execute("DELETE FROM stock_movements WHERE product_id = ?", (product_id,))
-                cur.execute("DELETE FROM products WHERE id = ?", (product_id,))
+                cur.execute(
+                    "UPDATE products SET is_active = 0 WHERE id = ? AND is_active = 1",
+                    (product_id,),
+                )
                 if cur.rowcount == 0:
                     return jsonify({'success': False, 'message': 'Məhsul tapılmadı'}), 404
                 _audit_event(conn, database_url, "product_deleted", "product", product_id)
@@ -2962,6 +3598,104 @@ def delete_product(product_id):
     except (sqlite3.Error, psycopg2.Error) as exc:
         conn.rollback()
         return jsonify({'success': False, 'message': str(exc)}), 500
+
+
+@app.route('/api/products/archive-all', methods=['POST'])
+def archive_all_products():
+    """Archive every active product without removing historical references."""
+    conn = get_db()
+    database_url, _ = get_db_config()
+    cur = conn.cursor()
+    try:
+        cur.execute(
+            "UPDATE products SET is_active = FALSE WHERE is_active = TRUE"
+            if database_url
+            else "UPDATE products SET is_active = 0 WHERE is_active = 1"
+        )
+        archived_count = cur.rowcount
+        _audit_event(
+            conn,
+            database_url,
+            "products_archived",
+            "product",
+            details=f"count={archived_count}",
+        )
+        conn.commit()
+        return jsonify({
+            "success": True,
+            "archived_count": archived_count,
+            "message": f"{archived_count} məhsul arxivləndi.",
+        })
+    except (sqlite3.Error, psycopg2.Error) as exc:
+        conn.rollback()
+        return jsonify({
+            "success": False,
+            "message": f"Məhsulları arxivləmək mümkün olmadı: {exc}",
+        }), 500
+    finally:
+        cur.close()
+
+
+def _clear_history_tables(tables, action, entity_type, parent_table):
+    conn = get_db()
+    database_url, _ = get_db_config()
+    cur = conn.cursor()
+    try:
+        deleted_counts = {}
+        for table in tables:
+            cur.execute(f"DELETE FROM {table}")
+            deleted_counts[table] = cur.rowcount
+        history_count = deleted_counts[parent_table]
+        _audit_event(
+            conn,
+            database_url,
+            action,
+            entity_type,
+            details=f"deleted={deleted_counts}",
+        )
+        conn.commit()
+        return jsonify({"success": True, "deleted_count": history_count})
+    except (sqlite3.Error, psycopg2.Error) as exc:
+        conn.rollback()
+        return jsonify({
+            "success": False,
+            "message": f"Tarixçəni təmizləmək mümkün olmadı: {exc}",
+        }), 500
+    finally:
+        cur.close()
+
+
+@app.route("/api/history/stock/clear", methods=["POST"])
+def clear_stock_history():
+    """Remove stock movement history without changing current stock levels."""
+    return _clear_history_tables(
+        ["stock_movements"],
+        "stock_history_cleared",
+        "stock_history",
+        "stock_movements",
+    )
+
+
+@app.route("/api/history/sales/clear", methods=["POST"])
+def clear_sales_history():
+    """Remove sales and their line items while preserving products and stock."""
+    return _clear_history_tables(
+        ["sale_items", "sales"],
+        "sales_history_cleared",
+        "sales_history",
+        "sales",
+    )
+
+
+@app.route("/api/history/debts/clear", methods=["POST"])
+def clear_debt_history():
+    """Remove all credit orders, including unpaid ones, and their line items."""
+    return _clear_history_tables(
+        ["credit_order_items", "credit_orders"],
+        "debt_history_cleared",
+        "debt_history",
+        "credit_orders",
+    )
 
 
 @app.route("/api/audit-log")
@@ -3110,6 +3844,38 @@ def delete_category(category_name):
     except (sqlite3.Error, psycopg2.Error) as exc:
         conn.rollback()
         return jsonify({'success': False, 'message': str(exc)}), 500
+
+
+@app.cli.command("send-daily-report")
+def send_daily_report_command():
+    """Send the daily sales, stock and new-debt report to configured managers."""
+    with app.app_context():
+        init_db()
+        conn = get_db()
+        database_url, _ = get_db_config()
+        recipients = _parse_email_recipients(
+            _get_app_setting(conn, database_url, "daily_report_recipients")
+        )
+        if not recipients:
+            raise ClickException(
+                "Admin səhifəsində gündəlik hesabat üçün e-poçt alıcıları qeyd edilməyib."
+            )
+        report_date = datetime.now(BAKU_TIMEZONE).date() - timedelta(days=1)
+        report = _build_daily_email_report(conn, database_url, report_date)
+        try:
+            _send_email(
+                recipients,
+                report["subject"],
+                report["text"],
+                report["html"],
+            )
+        except (RuntimeError, smtplib.SMTPException, OSError) as exc:
+            raise ClickException(f"Gündəlik hesabat göndərilmədi: {exc}") from exc
+        print(
+            f"Daily report sent for {report_date.isoformat()} to {len(recipients)} "
+            f"recipient(s): {report['sale_count']} sales, "
+            f"{report['debt_count']} new debts, {report['stock_count']} active products."
+        )
 
 
 if __name__ == "__main__":

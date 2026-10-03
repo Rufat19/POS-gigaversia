@@ -154,6 +154,9 @@
         </div>
         <div class="table-modal-actions">
           <button id="send-to-table" class="btn primary" type="button" data-i18n="send">Masaya göndər</button>
+          {% if feature_enabled('open_orders') %}
+            <button id="table-credit" class="btn secondary" type="button" data-i18n="credit" disabled>Açıq qalanlara borc yaz</button>
+          {% endif %}
           <button id="close-table-bill" class="btn danger" type="button" data-i18n="close">Hesabı bağla</button>
         </div>
         <div id="table-message" class="table-message"></div>
@@ -171,8 +174,13 @@
           operations:'Əməliyyatlar', reports:'Hesabatlar', admin:'Admin', manager:'Müdir', seller:'Satıcı',
           administrator:'Admin', logout:'Çıxış', legend:'Yaşıl masa boşdur, qırmızı masa doludur.',
           refresh:'Yenilə', table:'Masa', search:'Məhsul axtar...', send:'Masaya göndər',
-          close:'Hesabı bağla', available:'Boş', occupied:'Dolu', empty:'Bu masa hələ boşdur.',
+          close:'Hesabı bağla', credit:'Açıq qalanlara borc yaz', available:'Boş', occupied:'Dolu', empty:'Bu masa hələ boşdur.',
           sent:'Məhsullar masaya göndərildi.', confirm:'Bu masanın hesabı bağlansın?',
+          creditConfirm:'Masa hesabı borc kimi Açıq qalanlara köçürülsün və masa boşaldılsın?',
+          creditCustomerPrompt:'Borc kimin adına yazılsın?',
+          creditCustomerRequired:'Borc üçün ad yazın. Masa sifarişi dəyişməyib.',
+          creditSaved:'Masa borc kimi Açıq qalanlara köçürüldü.',
+          creditPending:'Əvvəl seçilmiş məhsulları masaya göndərin.',
           settings:'Tənzimləmələr', categoryFilter:'Kateqoriyaya görə', allCategories:'Bütün kateqoriyalar',
           statusFilter:'Vəziyyətə görə', allStatuses:'Bütün masalar', sortBy:'Sırala',
           sortNumberAsc:'Masa nömrəsi: artan', sortNumberDesc:'Masa nömrəsi: azalan',
@@ -191,8 +199,13 @@
           operations:'Operations', reports:'Reports', admin:'Admin', manager:'Manager', seller:'Seller',
           administrator:'Admin', logout:'Logout', legend:'Green is available, red is occupied.',
           refresh:'Refresh', table:'Table', search:'Search product...', send:'Send to table',
-          close:'Close bill', available:'Available', occupied:'Occupied', empty:'This table is empty.',
+          close:'Close bill', credit:'Save as open debt', available:'Available', occupied:'Occupied', empty:'This table is empty.',
           sent:'Products sent to table.', confirm:'Close this table bill?',
+          creditConfirm:'Move this bill to Open Orders as debt and free the table?',
+          creditCustomerPrompt:'Whose name should this debt be under?',
+          creditCustomerRequired:'Enter a name for the debt. The table order was not changed.',
+          creditSaved:'Table bill moved to Open Orders as debt.',
+          creditPending:'Send the selected products to the table first.',
           settings:'Settings', categoryFilter:'Filter by category', allCategories:'All categories',
           statusFilter:'Filter by status', allStatuses:'All tables', sortBy:'Sort',
           sortNumberAsc:'Table number: ascending', sortNumberDesc:'Table number: descending',
@@ -212,8 +225,14 @@
           seller:'Продавец', administrator:'Администратор', logout:'Выход',
           legend:'Зелёный стол свободен, красный занят.', refresh:'Обновить', table:'Стол',
           search:'Поиск товара...', send:'Отправить на стол', close:'Закрыть счёт',
+          credit:'Записать в открытые долги',
           available:'Свободен', occupied:'Занят', empty:'Этот стол пуст.',
           sent:'Товары отправлены на стол.', confirm:'Закрыть счёт этого стола?',
+          creditConfirm:'Перенести счёт в открытые долги и освободить стол?',
+          creditCustomerPrompt:'На чьё имя записать долг?',
+          creditCustomerRequired:'Укажите имя должника. Заказ стола не изменён.',
+          creditSaved:'Счёт стола перенесён в открытые долги.',
+          creditPending:'Сначала отправьте выбранные товары на стол.',
           settings:'Настройки', categoryFilter:'Фильтр по категории', allCategories:'Все категории',
           statusFilter:'Фильтр по статусу', allStatuses:'Все столы', sortBy:'Сортировка',
           sortNumberAsc:'Номер стола: по возрастанию', sortNumberDesc:'Номер стола: по убыванию',
@@ -232,8 +251,13 @@
           operations:'İşlemler', reports:'Raporlar', admin:'Admin', manager:'Yönetici', seller:'Satıcı',
           administrator:'Admin', logout:'Çıkış', legend:'Yeşil masa boş, kırmızı masa dolu.',
           refresh:'Yenile', table:'Masa', search:'Ürün ara...', send:'Masaya gönder',
-          close:'Hesabı kapat', available:'Boş', occupied:'Dolu', empty:'Bu masa boş.',
+          close:'Hesabı kapat', credit:'Açık borçlara kaydet', available:'Boş', occupied:'Dolu', empty:'Bu masa boş.',
           sent:'Ürünler masaya gönderildi.', confirm:'Bu masanın hesabı kapatılsın mı?',
+          creditConfirm:'Hesap açık borçlara aktarılsın ve masa boşaltılsın mı?',
+          creditCustomerPrompt:'Borç kimin adına yazılsın?',
+          creditCustomerRequired:'Borç için bir ad girin. Masa siparişi değişmedi.',
+          creditSaved:'Masa hesabı açık borçlara aktarıldı.',
+          creditPending:'Önce seçilen ürünleri masaya gönderin.',
           settings:'Ayarlar', categoryFilter:'Kategoriye göre filtrele', allCategories:'Tüm kategoriler',
           statusFilter:'Duruma göre filtrele', allStatuses:'Tüm masalar', sortBy:'Sırala',
           sortNumberAsc:'Masa numarası: artan', sortNumberDesc:'Masa numarası: azalan',
@@ -363,6 +387,8 @@
         document.getElementById('modal-title').textContent = `${t('table')} ${number}`;
         document.getElementById('table-modal').hidden = false;
         document.getElementById('table-message').textContent = '';
+        const creditButton = document.getElementById('table-credit');
+        if (creditButton) creditButton.disabled = !selectedTable || !selectedTable.occupied;
         renderProducts();
         renderSummary();
       }
@@ -379,6 +405,8 @@
         renderManagementTables();
         if (selectedTable) {
           selectedTable = tables.find(table => table.number === selectedTable.number);
+          const creditButton = document.getElementById('table-credit');
+          if (creditButton) creditButton.disabled = !selectedTable || !selectedTable.occupied;
           renderSummary();
         }
       }
@@ -412,6 +440,36 @@
         await loadTables();
         closeTableModal();
       });
+      const tableCreditButton = document.getElementById('table-credit');
+      if (tableCreditButton) {
+        tableCreditButton.addEventListener('click', async () => {
+          if (!selectedTable || !selectedTable.occupied) return;
+          if (pendingCart.length) {
+            document.getElementById('table-message').textContent = t('creditPending');
+            return;
+          }
+          if (!confirm(t('creditConfirm'))) return;
+          const customerName = prompt(t('creditCustomerPrompt'));
+          if (customerName === null) return;
+          if (!customerName.trim()) {
+            document.getElementById('table-message').textContent = t('creditCustomerRequired');
+            return;
+          }
+          const response = await fetch(`/api/tables/${selectedTable.number}/credit`, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({customer_name: customerName.trim()})
+          });
+          const result = await response.json();
+          if (!response.ok) {
+            document.getElementById('table-message').textContent = result.message || t('tableActionFailed');
+            return;
+          }
+          await loadTables();
+          closeTableModal();
+          alert(t('creditSaved'));
+        });
+      }
       document.getElementById('tables-lang-select').addEventListener('change', event => applyLanguage(event.target.value));
       ['table-category-filter', 'table-status-filter', 'table-sort', 'table-search'].forEach(id => {
         const filter = document.getElementById(id);

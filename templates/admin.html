@@ -64,6 +64,19 @@
         <div id="users-list" class="admin-users-list"></div>
         <div id="user-message" class="form-message" aria-live="polite"></div>
       </section>
+      <section class="card operations-card">
+        <h2>Gündəlik e-poçt hesabatı</h2>
+        <p>Hesabat hər gün Bakı vaxtı ilə saat 00:00-da göndərilir. Bir neçə ünvanı vergül, nöqtəli vergül və ya yeni sətirlə ayıra bilərsiniz.</p>
+        <label class="form-group">
+          <span>Müdirlərin e-poçt ünvanları</span>
+          <textarea id="daily-report-recipients" rows="4" maxlength="2000" placeholder="manager@example.com">{{ report_recipients }}</textarea>
+        </label>
+        <div class="form-actions">
+          <button id="save-daily-report" class="btn" type="button">E-poçtları yadda saxla</button>
+          <button id="test-daily-report" class="btn secondary" type="button">Test məktubu göndər</button>
+        </div>
+        <div id="daily-report-message" class="form-message" aria-live="polite"></div>
+      </section>
     </main>
 
     <script>
@@ -156,6 +169,33 @@
         const result = await response.json();
         userMessage.textContent = result.message || (result.success ? 'İstifadəçi yaradıldı.' : 'Əməliyyat uğursuz oldu.');
         if (result.success) { userName.value = ''; userPin.value = ''; loadUsers(); }
+      });
+      const reportRecipients = document.getElementById('daily-report-recipients');
+      const dailyReportMessage = document.getElementById('daily-report-message');
+      document.getElementById('save-daily-report').addEventListener('click', async () => {
+        try {
+          const response = await fetch('/api/admin/daily-report', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({recipients: reportRecipients.value})
+          });
+          const result = await response.json();
+          if (!response.ok) throw new Error(result.message || 'E-poçt ünvanları yadda saxlanmadı.');
+          reportRecipients.value = result.recipients;
+          dailyReportMessage.textContent = result.message;
+        } catch (error) {
+          dailyReportMessage.textContent = error.message;
+        }
+      });
+      document.getElementById('test-daily-report').addEventListener('click', async () => {
+        try {
+          const response = await fetch('/api/admin/daily-report/test', {method: 'POST'});
+          const result = await response.json();
+          if (!response.ok) throw new Error(result.message || 'Test məktubu göndərilmədi.');
+          dailyReportMessage.textContent = result.message;
+        } catch (error) {
+          dailyReportMessage.textContent = error.message;
+        }
       });
       loadUsers();
     </script>

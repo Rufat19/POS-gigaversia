@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Satış tarixçəsi</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}?v=20261001-radio">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}?v=20261003-sales-history">
   </head>
   <body>
     <div class="page-header">
@@ -41,7 +41,7 @@
       </div>
     </div>
 
-    <main class="container">
+    <main class="container sales-history-page">
       <section class="card history-card">
         <div class="history-header-row">
           <h3 data-i18n="sales.listTitle">Satışlar</h3>
@@ -49,9 +49,16 @@
             <span>{{ sales_count }}</span>
             <span data-i18n="sales.count">sətir</span>
           </div>
+          {% if session.get('role') in ('manager', 'admin') %}
+          <button id="clear-sales-history-btn" class="btn danger" type="button" data-i18n="sales.clearHistory">Satış tarixçəsini təmizlə</button>
+          {% endif %}
         </div>
+        {% if session.get('role') in ('manager', 'admin') %}
+        <div id="clear-sales-history-message" class="form-message" aria-live="polite"></div>
+        {% endif %}
 
-        <div class="history-presets" aria-label="Tarix aralığı qısa seçimləri">
+        <div class="history-presets" role="group" aria-label="Tarix aralığı qısa seçimləri">
+          <button class="preset-btn" type="button" data-range="today" data-i18n="sales.today">Bu gün</button>
           <button class="preset-btn" type="button" data-range="7" data-i18n="sales.last7">Son 7 gün</button>
           <button class="preset-btn" type="button" data-range="30" data-i18n="sales.last30">Son 30 gün</button>
           <button class="preset-btn" type="button" data-range="month" data-i18n="sales.thisMonth">Bu ay</button>
@@ -105,7 +112,10 @@
           'nav.reports': 'Hesabatlar', 'nav.admin': 'Admin',
           'role.seller': 'Satıcı', 'role.manager': 'Müdir', 'role.admin': 'Admin', 'common.logout': 'Çıxış',
           'sales.title': 'Satış tarixçəsi', 'sales.subtitle': 'Satışları tarix aralığına görə nəzərdən keçirin',
-          'sales.listTitle': 'Satışlar', 'sales.count': 'sətir', 'sales.last7': 'Son 7 gün',
+          'sales.listTitle': 'Satışlar', 'sales.count': 'sətir', 'sales.today': 'Bu gün', 'sales.last7': 'Son 7 gün',
+          'sales.clearHistory': 'Satış tarixçəsini təmizlə',
+          'sales.confirmClearHistory': 'Bütün satış tarixçəsi və satış sətirləri birdəfəlik silinsin? Bu əməliyyatı geri qaytarmaq mümkün deyil.',
+          'sales.clearedHistory': '{count} satış qeydi silindi.',
           'sales.last30': 'Son 30 gün', 'sales.thisMonth': 'Bu ay', 'sales.allDates': 'Bütün tarixlər',
           'sales.startDate': 'Başlanğıc tarix', 'sales.endDate': 'Bitmə tarixi', 'sales.filter': 'Filtrlə',
           'sales.dateColumn': 'Tarix', 'sales.productColumn': 'Məhsul', 'sales.quantityColumn': 'Miqdar',
@@ -117,7 +127,10 @@
           'nav.reports': 'Reports', 'nav.admin': 'Admin',
           'role.seller': 'Seller', 'role.manager': 'Manager', 'role.admin': 'Admin', 'common.logout': 'Logout',
           'sales.title': 'Sales history', 'sales.subtitle': 'Review sales by date range',
-          'sales.listTitle': 'Sales', 'sales.count': 'items', 'sales.last7': 'Last 7 days',
+          'sales.listTitle': 'Sales', 'sales.count': 'items', 'sales.today': 'Today', 'sales.last7': 'Last 7 days',
+          'sales.clearHistory': 'Clear sales history',
+          'sales.confirmClearHistory': 'Permanently delete all sales history and sale items? This action cannot be undone.',
+          'sales.clearedHistory': '{count} sales records deleted.',
           'sales.last30': 'Last 30 days', 'sales.thisMonth': 'This month', 'sales.allDates': 'All dates',
           'sales.startDate': 'Start date', 'sales.endDate': 'End date', 'sales.filter': 'Filter',
           'sales.dateColumn': 'Date', 'sales.productColumn': 'Product', 'sales.quantityColumn': 'Quantity',
@@ -129,7 +142,10 @@
           'nav.reports': 'Отчеты', 'nav.admin': 'Администратор',
           'role.seller': 'Продавец', 'role.manager': 'Менеджер', 'role.admin': 'Администратор', 'common.logout': 'Выход',
           'sales.title': 'История продаж', 'sales.subtitle': 'Просмотр продаж за выбранный период',
-          'sales.listTitle': 'Продажи', 'sales.count': 'позиций', 'sales.last7': 'Последние 7 дней',
+          'sales.listTitle': 'Продажи', 'sales.count': 'позиций', 'sales.today': 'Сегодня', 'sales.last7': 'Последние 7 дней',
+          'sales.clearHistory': 'Очистить историю продаж',
+          'sales.confirmClearHistory': 'Безвозвратно удалить всю историю продаж и позиции продаж? Это действие нельзя отменить.',
+          'sales.clearedHistory': 'Удалено записей продаж: {count}.',
           'sales.last30': 'Последние 30 дней', 'sales.thisMonth': 'Этот месяц', 'sales.allDates': 'За всё время',
           'sales.startDate': 'Дата начала', 'sales.endDate': 'Дата окончания', 'sales.filter': 'Фильтр',
           'sales.dateColumn': 'Дата', 'sales.productColumn': 'Товар', 'sales.quantityColumn': 'Количество',
@@ -141,7 +157,10 @@
           'nav.reports': 'Raporlar', 'nav.admin': 'Admin',
           'role.seller': 'Satıcı', 'role.manager': 'Yönetici', 'role.admin': 'Admin', 'common.logout': 'Çıkış',
           'sales.title': 'Satış geçmişi', 'sales.subtitle': 'Satışları tarih aralığına göre görüntüleyin',
-          'sales.listTitle': 'Satışlar', 'sales.count': 'kalem', 'sales.last7': 'Son 7 gün',
+          'sales.listTitle': 'Satışlar', 'sales.count': 'kalem', 'sales.today': 'Bugün', 'sales.last7': 'Son 7 gün',
+          'sales.clearHistory': 'Satış geçmişini temizle',
+          'sales.confirmClearHistory': 'Tüm satış geçmişi ve satış kalemleri kalıcı olarak silinsin mi? Bu işlem geri alınamaz.',
+          'sales.clearedHistory': '{count} satış kaydı silindi.',
           'sales.last30': 'Son 30 gün', 'sales.thisMonth': 'Bu ay', 'sales.allDates': 'Tüm tarihler',
           'sales.startDate': 'Başlangıç tarihi', 'sales.endDate': 'Bitiş tarihi', 'sales.filter': 'Filtrele',
           'sales.dateColumn': 'Tarih', 'sales.productColumn': 'Ürün', 'sales.quantityColumn': 'Miktar',
@@ -162,32 +181,80 @@
       }
 
       langSelect.addEventListener('change', () => applyLanguage(langSelect.value));
-      document.querySelectorAll('[data-range]').forEach((button) => {
+      const rangeButtons = [...document.querySelectorAll('[data-range]')];
+      const startDateInput = document.getElementById('sales-start-date');
+      const endDateInput = document.getElementById('sales-end-date');
+      const today = '{{ default_end }}';
+      const toDateInputValue = (date) => {
+        const localDate = new Date(date.getTime() - date.getTimezoneOffset() * 60000);
+        return localDate.toISOString().slice(0, 10);
+      };
+      function updateActiveRange() {
+        const end = new Date(`${today}T00:00:00`);
+        const selectedStart = startDateInput.value;
+        const selectedEnd = endDateInput.value;
+        const ranges = {
+          today: [today, today],
+          7: [toDateInputValue(new Date(end.getFullYear(), end.getMonth(), end.getDate() - 6)), today],
+          30: [toDateInputValue(new Date(end.getFullYear(), end.getMonth(), end.getDate() - 29)), today],
+        };
+        const monthStart = new Date();
+        monthStart.setFullYear(end.getFullYear(), end.getMonth(), 1);
+        ranges.month = [toDateInputValue(monthStart), today];
+        rangeButtons.forEach((button) => {
+          const range = ranges[button.dataset.range];
+          const active = button.dataset.range === 'all'
+            ? !selectedStart && !selectedEnd
+            : Boolean(range && selectedStart === range[0] && selectedEnd === range[1]);
+          button.classList.toggle('active', active);
+          button.setAttribute('aria-pressed', String(active));
+        });
+      }
+      updateActiveRange();
+      rangeButtons.forEach((button) => {
         button.addEventListener('click', () => {
-          const startInput = document.getElementById('sales-start-date');
-          const endInput = document.getElementById('sales-end-date');
           const range = button.dataset.range;
           if (range === 'all') {
-            startInput.value = '';
-            endInput.value = '';
+            startDateInput.value = '';
+            endDateInput.value = '';
           } else {
-            const end = new Date();
-            const start = new Date();
-            if (range === 'month') {
+            const end = new Date(`${today}T00:00:00`);
+            const start = new Date(end);
+            if (range === 'today') {
+              startDateInput.value = today;
+            } else if (range === 'month') {
               start.setDate(1);
+              startDateInput.value = toDateInputValue(start);
             } else {
               start.setDate(end.getDate() - (Number(range) - 1));
+              startDateInput.value = toDateInputValue(start);
             }
-            const toDateInputValue = (date) => {
-              const localDate = new Date(date.getTime() - date.getTimezoneOffset() * 60000);
-              return localDate.toISOString().slice(0, 10);
-            };
-            startInput.value = toDateInputValue(start);
-            endInput.value = toDateInputValue(end);
+            endDateInput.value = today;
           }
           document.getElementById('sales-date-filter').requestSubmit();
         });
       });
+      document.getElementById('sales-date-filter').addEventListener('change', updateActiveRange);
+
+      const clearSalesHistoryButton = document.getElementById('clear-sales-history-btn');
+      if (clearSalesHistoryButton) {
+        clearSalesHistoryButton.addEventListener('click', async () => {
+          if (!confirm((translations[langSelect.value] || translations.az)['sales.confirmClearHistory'])) return;
+          const message = document.getElementById('clear-sales-history-message');
+          clearSalesHistoryButton.disabled = true;
+          try {
+            const response = await fetch('/api/history/sales/clear', {method: 'POST'});
+            const result = await response.json();
+            if (!response.ok) throw new Error(result.message || 'Sales history clear failed.');
+            message.textContent = (translations[langSelect.value] || translations.az)['sales.clearedHistory']
+              .replace('{count}', result.deleted_count);
+            window.setTimeout(() => location.reload(), 800);
+          } catch (error) {
+            message.textContent = error.message;
+            clearSalesHistoryButton.disabled = false;
+          }
+        });
+      }
 
       applyLanguage(localStorage.getItem('pos_lang') || 'az');
     </script>

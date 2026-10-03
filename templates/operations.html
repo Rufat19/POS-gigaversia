@@ -124,7 +124,11 @@
         </section>
 
         <section class="card operations-card">
-          <h3 data-i18n="operations.manageProducts">Məhsul idarəetməsi</h3>
+          <div class="history-header-row">
+            <h3 data-i18n="operations.manageProducts">Məhsul idarəetməsi</h3>
+            <button id="archive-all-products-btn" class="btn danger" type="button" data-i18n="operations.archiveAllProducts">Bütün məhsulları arxivlə</button>
+          </div>
+          <div id="archive-products-message" class="form-message" aria-live="polite"></div>
           <div id="product-management-list" class="management-list">
             {% for p in products %}
             <div class="management-row" data-product-id="{{ p.id }}" data-product-name="{{ p.name }}" data-product-category="{{ p.category }}" data-product-price="{{ p.price }}" data-product-stock="{{ p.stock }}" data-product-image="{{ p.image_url or '' }}">
@@ -181,7 +185,11 @@
               <span id="history-count">0</span>
               <span data-i18n="operations.historyCount">əməliyyat</span>
             </div>
+            {% if session.get('role') in ('manager', 'admin') %}
+            <button id="clear-stock-history-btn" class="btn danger" type="button" data-i18n="operations.clearStockHistory">Anbar tarixçəsini təmizlə</button>
+            {% endif %}
           </div>
+          <div id="clear-stock-history-message" class="form-message" aria-live="polite"></div>
  
           <div class="history-presets" aria-label="Tarixçə qısa filtrləri">
             <button class="preset-btn active" data-range="7" type="button" data-i18n="operations.preset7">Son 7 gün</button>
@@ -271,6 +279,7 @@
           'operations.stock': 'Stok',
           'operations.imageUrl': 'Şəkil URL',
           'operations.manageProducts': 'Məhsul idarəetməsi',
+          'operations.archiveAllProducts': 'Bütün məhsulları arxivlə',
           'operations.edit': 'Dəyişdir',
           'operations.delete': 'Sil',
           'operations.stockMovement': 'Daxilolma / İtki əlavə et',
@@ -280,6 +289,9 @@
           'operations.note': 'Qeyd',
           'operations.add': 'Əlavə et',
           'operations.history': 'Anbar tarixçəsi',
+          'operations.clearStockHistory': 'Anbar tarixçəsini təmizlə',
+          'operations.confirmClearStockHistory': 'Bütün anbar əməliyyatlarının tarixçəsi silinsin? Cari stok qalıqları dəyişməyəcək.',
+          'operations.clearedStockHistory': '{count} anbar tarixçəsi qeydi silindi.',
           'operations.historyCount': 'əməliyyat',
           'operations.preset7': 'Son 7 gün',
           'operations.preset30': 'Son 30 gün',
@@ -310,13 +322,15 @@
           'operations.alert.productRequired': 'Məhsul adı daxil edin.',
           'operations.alert.stockMovementRequired': 'Məhsul və müsbət miqdar seçin',
           'operations.alert.confirmDelete': 'Bu məhsulu silmək istədiyinizə əminsiniz?',
+          'operations.alert.confirmArchiveAll': 'Bütün aktiv məhsullar arxivlənsin? Satış, borc və masa tarixçəsi qorunacaq.',
           'operations.alert.confirmCategoryDelete': ' kateqoriyasını silmək istədiyinizə əminsiniz? Məhsullar "Other" kateqoriyasına keçirəcək.',
           'operations.alert.success.categoryAdd': 'Kateqoriya əlavə edildi.',
           'operations.alert.success.categoryRename': 'Kateqoriya dəyişdirildi.',
           'operations.alert.success.categoryDelete': 'Kateqoriya silindi.',
           'operations.alert.success.productAdd': 'Məhsul əlavə edildi.',
           'operations.alert.success.stockAdd': 'Uğurla əlavə olundu.',
-          'operations.alert.processing': 'Əlavə edilir...'
+          'operations.alert.processing': 'Əlavə edilir...',
+          'operations.alert.success.archiveAll': '{count} məhsul arxivləndi.'
         },
         en: {
           'nav.products': 'Products',
@@ -345,6 +359,7 @@
           'operations.stock': 'Stock',
           'operations.imageUrl': 'Image URL',
           'operations.manageProducts': 'Manage products',
+          'operations.archiveAllProducts': 'Archive all products',
           'operations.edit': 'Edit',
           'operations.delete': 'Delete',
           'operations.stockMovement': 'Add stock in / out',
@@ -354,6 +369,9 @@
           'operations.note': 'Note',
           'operations.add': 'Add',
           'operations.history': 'Stock history',
+          'operations.clearStockHistory': 'Clear stock history',
+          'operations.confirmClearStockHistory': 'Delete all stock movement history? Current stock levels will not change.',
+          'operations.clearedStockHistory': '{count} stock history records deleted.',
           'operations.historyCount': 'entries',
           'operations.preset7': 'Last 7 days',
           'operations.preset30': 'Last 30 days',
@@ -384,13 +402,15 @@
           'operations.alert.productRequired': 'Enter a product name.',
           'operations.alert.stockMovementRequired': 'Select a product and positive quantity.',
           'operations.alert.confirmDelete': 'Are you sure you want to delete this product?',
+          'operations.alert.confirmArchiveAll': 'Archive all active products? Sales, credit, and table history will be preserved.',
           'operations.alert.confirmCategoryDelete': ' are you sure you want to delete this category? Products will move to "Other".',
           'operations.alert.success.categoryAdd': 'Category added.',
           'operations.alert.success.categoryRename': 'Category renamed.',
           'operations.alert.success.categoryDelete': 'Category deleted.',
           'operations.alert.success.productAdd': 'Product added.',
           'operations.alert.success.stockAdd': 'Added successfully.',
-          'operations.alert.processing': 'Adding...'
+          'operations.alert.processing': 'Adding...',
+          'operations.alert.success.archiveAll': '{count} products archived.'
         },
         ru: {
           'nav.products': 'Товары',
@@ -419,6 +439,7 @@
           'operations.stock': 'Остаток',
           'operations.imageUrl': 'URL изображения',
           'operations.manageProducts': 'Управление товарами',
+          'operations.archiveAllProducts': 'Архивировать все товары',
           'operations.edit': 'Изменить',
           'operations.delete': 'Удалить',
           'operations.stockMovement': 'Добавить приход / расход',
@@ -428,6 +449,9 @@
           'operations.note': 'Примечание',
           'operations.add': 'Добавить',
           'operations.history': 'История движений',
+          'operations.clearStockHistory': 'Очистить историю склада',
+          'operations.confirmClearStockHistory': 'Удалить всю историю складских операций? Текущие остатки не изменятся.',
+          'operations.clearedStockHistory': 'Удалено записей истории склада: {count}.',
           'operations.historyCount': 'операций',
           'operations.preset7': 'Последние 7 дней',
           'operations.preset30': 'Последние 30 дней',
@@ -458,13 +482,15 @@
           'operations.alert.productRequired': 'Введите название товара.',
           'operations.alert.stockMovementRequired': 'Выберите товар и положительное количество.',
           'operations.alert.confirmDelete': 'Вы уверены, что хотите удалить этот товар?',
+          'operations.alert.confirmArchiveAll': 'Архивировать все активные товары? История продаж, долгов и столов сохранится.',
           'operations.alert.confirmCategoryDelete': ' вы уверены, что хотите удалить эту категорию? Товары будут перенесены в "Other".',
           'operations.alert.success.categoryAdd': 'Категория добавлена.',
           'operations.alert.success.categoryRename': 'Категория переименована.',
           'operations.alert.success.categoryDelete': 'Категория удалена.',
           'operations.alert.success.productAdd': 'Товар добавлен.',
           'operations.alert.success.stockAdd': 'Успешно добавлено.',
-          'operations.alert.processing': 'Добавление...'
+          'operations.alert.processing': 'Добавление...',
+          'operations.alert.success.archiveAll': 'Архивировано товаров: {count}.'
         },
         tr: {
           'nav.products': 'Ürünler',
@@ -493,6 +519,7 @@
           'operations.stock': 'Stok',
           'operations.imageUrl': 'Görsel URL',
           'operations.manageProducts': 'Ürün yönetimi',
+          'operations.archiveAllProducts': 'Tüm ürünleri arşivle',
           'operations.edit': 'Düzenle',
           'operations.delete': 'Sil',
           'operations.stockMovement': 'Giriş / Çıkış ekle',
@@ -502,6 +529,9 @@
           'operations.note': 'Not',
           'operations.add': 'Ekle',
           'operations.history': 'Stok geçmişi',
+          'operations.clearStockHistory': 'Stok geçmişini temizle',
+          'operations.confirmClearStockHistory': 'Tüm stok hareketleri silinsin mi? Mevcut stok miktarları değişmeyecek.',
+          'operations.clearedStockHistory': '{count} stok geçmişi kaydı silindi.',
           'operations.historyCount': 'işlem',
           'operations.preset7': 'Son 7 gün',
           'operations.preset30': 'Son 30 gün',
@@ -532,13 +562,15 @@
           'operations.alert.productRequired': 'Ürün adını girin.',
           'operations.alert.stockMovementRequired': 'Ürün ve pozitif miktar seçin.',
           'operations.alert.confirmDelete': 'Bu ürünü silmek istediğinize emin misiniz?',
+          'operations.alert.confirmArchiveAll': 'Tüm aktif ürünler arşivlensin mi? Satış, borç ve masa geçmişi korunacak.',
           'operations.alert.confirmCategoryDelete': ' kategorisini silmek istediğinize emin misiniz? Ürünler "Other" kategorisine taşınacak.',
           'operations.alert.success.categoryAdd': 'Kategori eklendi.',
           'operations.alert.success.categoryRename': 'Kategori yeniden adlandırıldı.',
           'operations.alert.success.categoryDelete': 'Kategori silindi.',
           'operations.alert.success.productAdd': 'Ürün eklendi.',
           'operations.alert.success.stockAdd': 'Başarıyla eklendi.',
-          'operations.alert.processing': 'Ekleniyor...'
+          'operations.alert.processing': 'Ekleniyor...',
+          'operations.alert.success.archiveAll': '{count} ürün arşivlendi.'
         }
       };
 
@@ -756,6 +788,42 @@
           if(!res.ok) throw new Error(data.message || 'Product delete failed.');
           location.reload();
         } catch(e){ alert(e.message); }
+      }
+
+      document.getElementById('archive-all-products-btn').addEventListener('click', async () => {
+        if (!confirm(t('operations.alert.confirmArchiveAll'))) return;
+        const message = document.getElementById('archive-products-message');
+        const button = document.getElementById('archive-all-products-btn');
+        button.disabled = true;
+        try {
+          const response = await fetch('/api/products/archive-all', {method: 'POST'});
+          const result = await response.json();
+          if (!response.ok) throw new Error(result.message || 'Product archive failed.');
+          message.textContent = t('operations.alert.success.archiveAll').replace('{count}', result.archived_count);
+          window.setTimeout(() => location.reload(), 800);
+        } catch (error) {
+          message.textContent = error.message;
+          button.disabled = false;
+        }
+      });
+
+      const clearStockHistoryButton = document.getElementById('clear-stock-history-btn');
+      if (clearStockHistoryButton) {
+        clearStockHistoryButton.addEventListener('click', async () => {
+          if (!confirm(t('operations.confirmClearStockHistory'))) return;
+          const message = document.getElementById('clear-stock-history-message');
+          clearStockHistoryButton.disabled = true;
+          try {
+            const response = await fetch('/api/history/stock/clear', {method: 'POST'});
+            const result = await response.json();
+            if (!response.ok) throw new Error(result.message || 'Stock history clear failed.');
+            message.textContent = t('operations.clearedStockHistory').replace('{count}', result.deleted_count);
+            window.setTimeout(() => location.reload(), 800);
+          } catch (error) {
+            message.textContent = error.message;
+            clearStockHistoryButton.disabled = false;
+          }
+        });
       }
 
       async function editProduct(productId) {

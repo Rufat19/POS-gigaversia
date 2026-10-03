@@ -70,7 +70,15 @@
         <div id="open-orders-list" class="credit-orders-grid"></div>
       </section>
       <section class="paid-orders-section">
-        <h2 class="paid-history-title">Borc tarixçəsi</h2>
+        <div class="history-header-row">
+          <h2 class="paid-history-title">Borc tarixçəsi</h2>
+          {% if session.get('role') in ('manager', 'admin') %}
+          <button id="clear-debt-history-btn" class="btn danger" type="button">Borc tarixçəsini təmizlə</button>
+          {% endif %}
+        </div>
+        {% if session.get('role') in ('manager', 'admin') %}
+        <div id="clear-debt-history-message" class="form-message" aria-live="polite"></div>
+        {% endif %}
         <div id="paid-orders-list" class="credit-orders-grid"></div>
       </section>
     </main>
@@ -89,7 +97,10 @@
           noOpen: 'Açıq sifariş yoxdur.', noHistory: 'Borc tarixçəsi boşdur.',
           paymentPrompt: 'Ödənilən məbləği yazın (AZN):', fullPaymentConfirm: 'Borcun qalan {amount} AZN məbləği tam ödənilsin?',
           invalidPayment: 'Düzgün ödəniş məbləği yazın.',
-          paymentFailed: 'Ödəniş qeydə alınmadı.', loadFailed: 'Sifarişlər yüklənmədi.'
+          paymentFailed: 'Ödəniş qeydə alınmadı.', loadFailed: 'Sifarişlər yüklənmədi.',
+          clearDebtHistory: 'Borc tarixçəsini təmizlə',
+          confirmClearDebtHistory: 'Bütün ödənilmiş və açıq borclar, o cümlədən ödənilməmiş sifarişlər birdəfəlik silinsin? Satış tarixçəsi dəyişməyəcək. Bu əməliyyatı geri qaytarmaq mümkün deyil.',
+          clearedDebtHistory: '{count} borc qeydi silindi.'
         },
         en: {
           products: 'Products', openOrders: 'Open orders', salesHistory: 'Sales history', operations: 'Operations',
@@ -103,7 +114,10 @@
           noOpen: 'No open orders.', noHistory: 'Credit history is empty.',
           paymentPrompt: 'Enter payment amount (AZN):', fullPaymentConfirm: 'Pay the remaining balance of {amount} AZN in full?',
           invalidPayment: 'Enter a valid payment amount.',
-          paymentFailed: 'Payment was not recorded.', loadFailed: 'Orders could not be loaded.'
+          paymentFailed: 'Payment was not recorded.', loadFailed: 'Orders could not be loaded.',
+          clearDebtHistory: 'Clear debt history',
+          confirmClearDebtHistory: 'Permanently delete all paid and open debts, including unpaid orders? Sales history will not be changed. This action cannot be undone.',
+          clearedDebtHistory: '{count} debt records deleted.'
         },
         ru: {
           products: 'Товары', openOrders: 'Открытые заказы', salesHistory: 'История продаж', operations: 'Операции',
@@ -117,7 +131,10 @@
           noOpen: 'Нет открытых заказов.', noHistory: 'История долгов пуста.',
           paymentPrompt: 'Введите сумму оплаты (AZN):', fullPaymentConfirm: 'Полностью оплатить оставшуюся сумму {amount} AZN?',
           invalidPayment: 'Введите корректную сумму.',
-          paymentFailed: 'Платеж не записан.', loadFailed: 'Не удалось загрузить заказы.'
+          paymentFailed: 'Платеж не записан.', loadFailed: 'Не удалось загрузить заказы.',
+          clearDebtHistory: 'Очистить историю долгов',
+          confirmClearDebtHistory: 'Безвозвратно удалить все оплаченные и открытые долги, включая неоплаченные заказы? История продаж не изменится. Это действие нельзя отменить.',
+          clearedDebtHistory: 'Удалено записей долгов: {count}.'
         },
         tr: {
           products: 'Ürünler', openOrders: 'Açık siparişler', salesHistory: 'Satış geçmişi', operations: 'İşlemler',
@@ -131,7 +148,10 @@
           noOpen: 'Açık sipariş yok.', noHistory: 'Borç geçmişi boş.',
           paymentPrompt: 'Ödeme tutarını yazın (AZN):', fullPaymentConfirm: 'Kalan {amount} AZN borç tamamen ödensin mi?',
           invalidPayment: 'Geçerli bir ödeme tutarı yazın.',
-          paymentFailed: 'Ödeme kaydedilmedi.', loadFailed: 'Siparişler yüklenemedi.'
+          paymentFailed: 'Ödeme kaydedilmedi.', loadFailed: 'Siparişler yüklenemedi.',
+          clearDebtHistory: 'Borç geçmişini temizle',
+          confirmClearDebtHistory: 'Ödenmemiş siparişler dahil tüm ödenmiş ve açık borçlar kalıcı olarak silinsin mi? Satış geçmişi değişmeyecek. Bu işlem geri alınamaz.',
+          clearedDebtHistory: '{count} borç kaydı silindi.'
         }
       };
       let currentLang = localStorage.getItem('pos_lang') || 'az';
@@ -156,6 +176,8 @@
         document.querySelector('.logout-link').textContent = dict.logout;
         document.querySelector('.back-products').textContent = dict.back;
         document.querySelector('.paid-history-title').textContent = dict.history;
+        const clearDebtHistoryButton = document.getElementById('clear-debt-history-btn');
+        if (clearDebtHistoryButton) clearDebtHistoryButton.textContent = dict.clearDebtHistory;
         document.getElementById('orders-search').placeholder = dict.searchCustomer;
         document.querySelector('[data-status="all"]').textContent = dict.all;
         document.querySelector('[data-status="open"]').textContent = dict.open;
@@ -254,6 +276,25 @@
         renderOrderLists();
       }));
       document.getElementById('orders-group-by-customer').addEventListener('change', renderOrderLists);
+      const clearDebtHistoryButton = document.getElementById('clear-debt-history-btn');
+      if (clearDebtHistoryButton) {
+        clearDebtHistoryButton.addEventListener('click', async () => {
+          if (!window.confirm(t('confirmClearDebtHistory'))) return;
+          const message = document.getElementById('clear-debt-history-message');
+          clearDebtHistoryButton.disabled = true;
+          try {
+            const response = await fetch('/api/history/debts/clear', {method: 'POST'});
+            const result = await response.json();
+            if (!response.ok) throw new Error(result.message || t('loadFailed'));
+            message.textContent = t('clearedDebtHistory').replace('{count}', result.deleted_count);
+            allOrders = [];
+            renderOrderLists();
+          } catch (error) {
+            message.textContent = error.message;
+            clearDebtHistoryButton.disabled = false;
+          }
+        });
+      }
       applyLanguage(currentLang);
       loadOrders().catch(error=>{
         document.getElementById('open-orders-list').innerHTML=`<p class="error-state">${escapeHtml(error.message)}</p>`;

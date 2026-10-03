@@ -14,6 +14,8 @@ Kiçik biznes üçün hazırlanmış, toxunma-dostu (touch-friendly) satış nö
 
 ### 1. POS / Kiosk səhifəsi
 - Kateqoriya üzrə məhsul seçimi (Drinks, Fastfood, Other, Protein, Salads, Snacks)
+- İstifadədən çıxarılan məhsullar arxivlənir; satış, masa və borc tarixçəsindəki məhsul qeydləri saxlanılır
+- Əməliyyatlar bölməsindən bütün aktiv məhsulları birdəfəlik arxivləmək mümkündür; tarixçə saxlanılır
 - Toxunma-dostu interfeys, miqdar seçimi ilə səbətə əlavə etmə
 - Səbətdə real-vaxt cəm hesablama
 - Satışı təsdiqləmə - stok avtomatik azalır, qalıq kifayət etmədikdə satış mənfi stokla da davam edir
@@ -22,12 +24,14 @@ Kiçik biznes üçün hazırlanmış, toxunma-dostu (touch-friendly) satış nö
 
 ### 2. Açıq qalanlar / Nisyə sifarişlər
 - Səbətdəki məhsulları müştərinin adı ilə açıq sifariş kimi saxlamaq
+- Masa hesabını borclunun adı ilə Açıq qalanlara köçürmək və masanı boşaltmaq
 - Sonrakı səfərdə həmin müştərinin sifarişinə yeni məhsullar əlavə etmək
 - Açıq sifariş bağlananda onu ödənilmiş borc tarixçəsində saxlamaq
 - Açıq nisyə sifariş yaradılarkən və yenilənərkən stokun avtomatik azaldılması
 
 ### 3. Masalar
 - Masalar kateqoriyaya görə avtomatik qruplaşdırılır; boş/dolu vəziyyətinə görə filtrləmək, ad və nömrəyə görə sıralamaq mümkündür
+- Masa hesabını ödəyib bağlamaq və ya borc kimi Açıq qalanlara köçürmək mümkündür; köçürülən masa dərhal boşalır
 - Müdir və admin üçün masa/kateqoriya tənzimləmələri Masalar bölməsindəki Tənzimləmələr düyməsindədir
 
 ### 4. Əməliyyatlar (Transactions)
@@ -35,11 +39,13 @@ Kiçik biznes üçün hazırlanmış, toxunma-dostu (touch-friendly) satış nö
 - Daxilolma qeyd ediləndə əlaqəli məhsulun stoku artır
 - İtki qeyd ediləndə stok azalır, mövcud stokdan çox itkiyə icazə verilmir
 - Satış zamanı stok miqdarı satışa mane olmur və qalıq mənfiyə düşə bilər
+- Müdir və admin anbar tarixçəsini silə bilər; cari stok qalıqları dəyişmir
 
 ### 5. Satış tarixçəsi
 - Satış sətirləri ayrıca bölmədə göstərilir
 - Satıcı, müdir və admin üçün daim açıqdır
-- Başlanğıc və bitmə tarixi seçərək satışları filtrləmək mümkündür
+- Səhifə Bakı vaxtı ilə cari günün satışları ilə açılır; “Bu gün” və digər hazır filtrlər, eləcə də tarix aralığı seçimi mövcuddur
+- Müdir və admin bütün satış tarixçəsini ayrıca və geri qaytarılmayacaq şəkildə silə bilər
 
 ### 6. Hesabatlar
 - Tarix aralığı seçimi ilə filtrlənən analitika
@@ -47,6 +53,8 @@ Kiçik biznes üçün hazırlanmış, toxunma-dostu (touch-friendly) satış nö
 - Kateqoriya üzrə satış payı (pie chart)
 - Gün üzrə satış məbləği (bar chart)
 - Top 5 məhsul (bar chart)
+
+Müdir və admin borc tarixçəsini də təmizləyə bilər. Bu əməliyyat ödənilmiş borclarla yanaşı açıq və ödənilməmiş sifarişləri də silir; satış tarixçəsini və məhsul stokunu dəyişmir. Tarixçə təmizləmə düymələri satıcılara göstərilmir.
 
 ### 7. Rol-əsaslı giriş sistemi
 4 rəqəmli PIN kodları ilə üç rol:
@@ -64,6 +72,20 @@ PIN-lər artıq `.env` dəyişənlərindən oxunur:
 - `MANAGER_PIN`
 - `ADMIN_PIN`
 - `SECRET_KEY`
+
+### Gündəlik e-poçt hesabatı
+
+Admin bölməsində müdirlərin bir və ya bir neçə e-poçt ünvanını qeyd edin və test məktubu göndərərək SMTP bağlantısını yoxlayın. Hər gün Bakı vaxtı ilə saat 00:00-da göndərilən hesabatda əvvəlki Bakı təqvim gününün satış cəmi və məhsul xülasəsi, həmin gün yaradılmış borcların müştəri adı/məbləği, həmçinin bütün aktiv məhsulların cari stok qalığı olur.
+
+SMTP parametrləri Railway Variables-da saxlanmalıdır: `SMTP_HOST`, `SMTP_PORT`, `SMTP_USERNAME`, `SMTP_PASSWORD`, `SMTP_FROM`, `SMTP_USE_TLS`, `SMTP_USE_SSL` və istəyə görə `SMTP_TIMEOUT`. Bu e-poçt giriş məlumatlarını admin səhifəsinə və ya repozitoriyə yazmayın.
+
+Railway-də eyni layihə/verilənlər bazasından istifadə edən ayrıca Cron service yaradın:
+
+- **Start Command:** `flask --app app send-daily-report`
+- **Cron Schedule:** `0 20 * * *` (Railway cron UTC işləyir; 20:00 UTC Bakı vaxtı ilə 00:00-dır)
+- **Variables:** web service-in `DATABASE_URL` və `SMTP_*` dəyişənləri ilə eyni dəyərləri istifadə edin.
+
+Cron service işləyən web service-dən ayrı olmalıdır; beləliklə Gunicorn worker-lərinin hər birində ayrıca planlayıcı açılıb eyni hesabatı təkrar göndərməyəcək. Test məktubunu admin panelindən yoxladıqdan və Railway Cron service-i aktiv etdikdən sonra gündəlik göndəriş başlayır.
 
 `ADMIN_PIN` verilməsə, lokal inkişaf üçün `414541` istifadə olunur. Production-da
 öz admin PIN-inizi Railway Variables bölməsində təyin edin.
