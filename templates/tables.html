@@ -43,7 +43,7 @@
           {% if session.get('role') in ('manager', 'admin') and feature_enabled('operations') %}
             <button class="btn secondary" id="open-table-settings" type="button" data-i18n="settings">Tənzimləmələr</button>
           {% endif %}
-          <button class="btn primary" type="button" onclick="loadTables()" data-i18n="refresh">Yenilə</button>
+          <button class="btn primary" type="button" onclick="refreshTables()" data-i18n="refresh">Yenilə</button>
         </div>
       </div>
       <div class="tables-toolbar">
@@ -206,7 +206,10 @@
           rename:'Dəyişdir', delete:'Sil', tableList:'Masalar',
           editTableNamePrompt:'Masa adı:', editTableCategoryPrompt:'Masa kateqoriyası:',
           deleteTableConfirm:' masası silinsin?', deleteCategoryConfirm:' kateqoriyası silinsin?',
-          tableActionFailed:'Masa əməliyyatı uğursuz oldu.'
+          tableActionFailed:'Masa əməliyyatı uğursuz oldu.',
+          tablesUnavailable:'Masaları yükləmək mümkün olmadı. Yenidən yoxlayın.',
+          productsUnavailable:'Məhsulları yükləmək mümkün olmadı. Masalar yenə istifadə oluna bilər.',
+          invalidApiResponse:'Serverdən gözlənilməz cavab alındı.'
         },
         en: {
           products:'Products', tables:'Tables', tablesDescription:'Table orders', openOrders:'Open orders', salesHistory:'Sales history',
@@ -231,7 +234,10 @@
           rename:'Rename', delete:'Delete', tableList:'Tables',
           editTableNamePrompt:'Table name:', editTableCategoryPrompt:'Table category:',
           deleteTableConfirm:' table will be deleted?', deleteCategoryConfirm:' category will be deleted?',
-          tableActionFailed:'Table operation failed.'
+          tableActionFailed:'Table operation failed.',
+          tablesUnavailable:'Could not load tables. Please try again.',
+          productsUnavailable:'Could not load products. Tables are still available.',
+          invalidApiResponse:'Received an unexpected response from the server.'
         },
         ru: {
           products:'Товары', tables:'Столы', tablesDescription:'Заказы по столам', openOrders:'Открытые заказы', salesHistory:'История продаж',
@@ -258,7 +264,10 @@
           rename:'Изменить', delete:'Удалить', tableList:'Столы',
           editTableNamePrompt:'Название стола:', editTableCategoryPrompt:'Категория стола:',
           deleteTableConfirm:' стол будет удалён?', deleteCategoryConfirm:' категория будет удалена?',
-          tableActionFailed:'Не удалось выполнить действие со столом.'
+          tableActionFailed:'Не удалось выполнить действие со столом.',
+          tablesUnavailable:'Не удалось загрузить столы. Повторите попытку.',
+          productsUnavailable:'Не удалось загрузить товары. Столы по-прежнему доступны.',
+          invalidApiResponse:'Сервер вернул неожиданный ответ.'
         },
         tr: {
           products:'Ürünler', tables:'Masalar', tablesDescription:'Masa siparişleri', openOrders:'Açık siparişler', salesHistory:'Satış geçmişi',
@@ -283,7 +292,10 @@
           rename:'Düzenle', delete:'Sil', tableList:'Masalar',
           editTableNamePrompt:'Masa adı:', editTableCategoryPrompt:'Masa kategorisi:',
           deleteTableConfirm:' masası silinsin mi?', deleteCategoryConfirm:' kategorisi silinsin mi?',
-          tableActionFailed:'Masa işlemi başarısız oldu.'
+          tableActionFailed:'Masa işlemi başarısız oldu.',
+          tablesUnavailable:'Masalar yüklenemedi. Lütfen tekrar deneyin.',
+          productsUnavailable:'Ürünler yüklenemedi. Masalar yine de kullanılabilir.',
+          invalidApiResponse:'Sunucudan beklenmeyen bir yanıt alındı.'
         }
       };
       let currentLang = localStorage.getItem('pos_lang') || 'az';
@@ -400,7 +412,9 @@
         pendingCart = [];
         document.getElementById('modal-title').textContent = `${t('table')} ${number}`;
         document.getElementById('table-modal').hidden = false;
-        document.getElementById('table-message').textContent = '';
+        document.getElementById('table-message').textContent = productsLoadError
+          ? productsLoadError.message || t('productsUnavailable')
+          : '';
         const creditButton = document.getElementById('table-credit');
         if (creditButton) creditButton.disabled = !selectedTable || !selectedTable.occupied;
         renderProducts();
@@ -410,10 +424,48 @@
         document.getElementById('table-modal').hidden = true;
         selectedTable = null;
       }
+      async function getJsonWithRetry(url, unavailableMessage) {
+        const retryableStatuses = [500, 502, 503, 504];
+        for (let attempt = 0; attempt < 3; attempt += 1) {
+          let response;
+          try {
+            response = await fetch(url);
+          } catch (error) {
+            if (attempt === 2) throw new Error(unavailableMessage);
+            await new Promise(resolve => setTimeout(resolve, 400 * (attempt + 1)));
+            continue;
+          }
+          if (retryableStatuses.includes(response.status) && attempt < 2) {
+            await new Promise(resolve => setTimeout(resolve, 400 * (attempt + 1)));
+            continue;
+          }
+          if (!(response.headers.get('content-type') || '').includes('json')) {
+            throw new Error(response.ok ? t('invalidApiResponse') : `${unavailableMessage} (HTTP ${response.status})`);
+          }
+          let result;
+          try {
+            result = await response.json();
+          } catch (error) {
+            throw new Error(t('invalidApiResponse'));
+          }
+          if (!response.ok) throw new Error(result.message || `${unavailableMessage} (HTTP ${response.status})`);
+          return result;
+        }
+        throw new Error(unavailableMessage);
+      }
+      let productsLoadError = null;
+      function showTablesLoadError(error) {
+        document.getElementById('tables-grid').innerHTML =
+          `<p class="error-state">${escapeHtml(error.message || t('tablesUnavailable'))} <button class="btn secondary" type="button" onclick="refreshTables()">${t('refresh')}</button></p>`;
+      }
+      async function refreshTables() {
+        const [tablesResult, productsResult] = await Promise.allSettled([loadTables(), loadProducts()]);
+        if (tablesResult.status === 'rejected') showTablesLoadError(tablesResult.reason);
+        if (productsResult.status === 'rejected') productsLoadError = productsResult.reason;
+      }
       async function loadTables() {
-        const response = await fetch('/api/tables');
-        const result = await response.json();
-        if (!response.ok) throw new Error(result.message || 'Masalar yüklənmədi.');
+        const result = await getJsonWithRetry('/api/tables', t('tablesUnavailable'));
+        if (!Array.isArray(result.tables)) throw new Error(t('invalidApiResponse'));
         tables = result.tables;
         renderTables();
         renderManagementTables();
@@ -425,10 +477,10 @@
         }
       }
       async function loadProducts() {
-        const response = await fetch('/api/tables/products');
-        const result = await response.json();
-        if (!response.ok) throw new Error(result.message || 'Məhsullar yüklənmədi.');
+        const result = await getJsonWithRetry('/api/tables/products', t('productsUnavailable'));
         products = result.products;
+        if (!Array.isArray(products)) throw new Error(t('invalidApiResponse'));
+        productsLoadError = null;
       }
       document.getElementById('table-product-search').addEventListener('input', renderProducts);
       document.getElementById('send-to-table').addEventListener('click', async () => {
@@ -606,9 +658,7 @@
         });
       }
       applyLanguage(currentLang);
-      Promise.all([loadProducts(), loadTables()]).catch(error => {
-        document.getElementById('tables-grid').innerHTML = `<p class="error-state">${escapeHtml(error.message)}</p>`;
-      });
+      refreshTables();
     </script>
     {% if feature_enabled('radio') %}{% include '_radio_player.html' %}{% endif %}
   </body>
