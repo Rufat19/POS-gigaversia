@@ -113,6 +113,21 @@
       </main>
     </div>
 
+    <dialog id="open-order-dialog" class="product-edit-dialog">
+      <form id="open-order-form" class="product-edit-form">
+        <h2 data-i18n="credit.dialogTitle">Açıq sifariş</h2>
+        <label class="form-group">
+          <span data-i18n="credit.customerName">Müştərinin adı</span>
+          <input id="open-order-customer-name" type="text" maxlength="200" required autocomplete="name" data-i18n-placeholder="credit.customerPlaceholder">
+        </label>
+        <div id="open-order-message" class="form-message" aria-live="polite"></div>
+        <div class="form-actions">
+          <button id="cancel-open-order" class="btn secondary" type="button" data-i18n="common.cancel">Ləğv et</button>
+          <button id="save-open-order" class="btn primary" type="submit" data-i18n="credit.saveOrder">Açıq saxla</button>
+        </div>
+      </form>
+    </dialog>
+
     <script>
       // App JS - improved and organized
       const currentRole = '{{ "admin" if session.get("role") == "admin" else ("manager" if session.get("role") == "manager" else "seller") }}';
@@ -141,8 +156,13 @@
           'cart.checkout': 'Satışı təsdiqlə',
           'cart.clear': 'Təmizlə',
           'cart.keepOpen': 'Açıq saxla',
-          'credit.customerPrompt': 'Müştərinin adını yazın:',
+          'credit.dialogTitle': 'Açıq sifariş',
+          'credit.customerName': 'Müştərinin adı',
+          'credit.customerPlaceholder': 'Müştərinin adını yazın',
+          'credit.customerRequired': 'Müştərinin adını daxil edin.',
+          'credit.saveOrder': 'Açıq saxla',
           'credit.saved': 'Açıq sifariş saxlanıldı.',
+          'common.cancel': 'Ləğv et',
           'alert.minQty': 'Miqdar 1-dən az ola bilməz.',
           'alert.emptyCart': 'Səbət boşdur.',
           'checkout.processing': 'Satış yazılır...',
@@ -173,8 +193,13 @@
           'cart.checkout': 'Confirm sale',
           'cart.clear': 'Clear',
           'cart.keepOpen': 'Keep open',
-          'credit.customerPrompt': 'Enter the customer name:',
+          'credit.dialogTitle': 'Open order',
+          'credit.customerName': 'Customer name',
+          'credit.customerPlaceholder': 'Enter the customer name',
+          'credit.customerRequired': 'Enter the customer name.',
+          'credit.saveOrder': 'Keep open',
           'credit.saved': 'Open order saved.',
+          'common.cancel': 'Cancel',
           'alert.minQty': 'Quantity cannot be less than 1.',
           'alert.emptyCart': 'Cart is empty.',
           'checkout.processing': 'Processing sale...',
@@ -205,8 +230,13 @@
           'cart.checkout': 'Подтвердить продажу',
           'cart.clear': 'Очистить',
           'cart.keepOpen': 'Оставить открытым',
-          'credit.customerPrompt': 'Введите имя клиента:',
+          'credit.dialogTitle': 'Открытый заказ',
+          'credit.customerName': 'Имя клиента',
+          'credit.customerPlaceholder': 'Введите имя клиента',
+          'credit.customerRequired': 'Введите имя клиента.',
+          'credit.saveOrder': 'Сохранить открытым',
           'credit.saved': 'Открытый заказ сохранен.',
+          'common.cancel': 'Отмена',
           'alert.minQty': 'Количество не может быть меньше 1.',
           'alert.emptyCart': 'Корзина пуста.',
           'checkout.processing': 'Обработка продажи...',
@@ -237,8 +267,13 @@
           'cart.checkout': 'Satışı onayla',
           'cart.clear': 'Temizle',
           'cart.keepOpen': 'Açık tut',
-          'credit.customerPrompt': 'Müşteri adını yazın:',
+          'credit.dialogTitle': 'Açık sipariş',
+          'credit.customerName': 'Müşteri adı',
+          'credit.customerPlaceholder': 'Müşteri adını yazın',
+          'credit.customerRequired': 'Müşteri adını girin.',
+          'credit.saveOrder': 'Açık tut',
           'credit.saved': 'Açık sipariş kaydedildi.',
+          'common.cancel': 'İptal',
           'alert.minQty': 'Miktar 1\'den küçük olamaz.',
           'alert.emptyCart': 'Sepet boş.',
           'checkout.processing': 'Satış işleniyor...',
@@ -395,10 +430,27 @@
          await addToOpenOrder(openOrderId);
          return;
        }
-       const customerName = window.prompt(translations[currentLang]['credit.customerPrompt']);
-       if(customerName === null) return;
-       const name = customerName.trim();
-       if(!name){ alert(translations[currentLang]['credit.customerPrompt']); return; }
+       document.getElementById('open-order-message').textContent = '';
+       document.getElementById('open-order-customer-name').value = '';
+       document.getElementById('open-order-dialog').showModal();
+       document.getElementById('open-order-customer-name').focus();
+      }
+
+      document.getElementById('cancel-open-order').addEventListener('click', () => {
+        document.getElementById('open-order-dialog').close();
+      });
+
+      document.getElementById('open-order-form').addEventListener('submit', async event => {
+       event.preventDefault();
+       const name = document.getElementById('open-order-customer-name').value.trim();
+       const dialogMessage = document.getElementById('open-order-message');
+       if(!name){
+         dialogMessage.textContent = translations[currentLang]['credit.customerRequired'];
+         return;
+       }
+       const saveButton = document.getElementById('save-open-order');
+       saveButton.disabled = true;
+       dialogMessage.textContent = '';
        const messageBox=document.getElementById('checkout-message');
        messageBox.textContent=translations[currentLang]['checkout.processing'];
        try{
@@ -410,6 +462,7 @@
          const result = await response.json();
          if(!response.ok) throw new Error(result.message || translations[currentLang]['checkout.defaultError']);
          messageBox.textContent=result.message || translations[currentLang]['credit.saved'];
+         document.getElementById('open-order-dialog').close();
          cart.forEach(item=>{
            const stockEl=document.getElementById('stock-'+item.id);
            if(stockEl){
@@ -419,8 +472,13 @@
          });
          cart.length=0;
          renderCart();
-       }catch(err){ messageBox.textContent=err.message; }
-      }
+       }catch(err){
+         dialogMessage.textContent = err.message;
+         messageBox.textContent = '';
+       }finally{
+         saveButton.disabled = false;
+       }
+      });
 
       async function addToOpenOrder(orderId){
        const messageBox=document.getElementById('checkout-message');
