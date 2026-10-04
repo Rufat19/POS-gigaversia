@@ -162,6 +162,20 @@
         <div id="table-message" class="table-message"></div>
       </div>
     </div>
+    <dialog id="table-credit-dialog" class="product-edit-dialog">
+      <form id="table-credit-form" class="product-edit-form">
+        <h2 data-i18n="creditDialogTitle">Borc kimi qeyd et</h2>
+        <label class="form-group">
+          <span data-i18n="creditCustomerName">Müştərinin adı</span>
+          <input id="table-credit-customer" type="text" maxlength="200" required autocomplete="name" data-i18n-placeholder="creditCustomerPlaceholder">
+        </label>
+        <div id="table-credit-message" class="form-message" aria-live="polite"></div>
+        <div class="form-actions">
+          <button id="cancel-table-credit" class="btn secondary" type="button" data-i18n="cancel">Ləğv et</button>
+          <button id="submit-table-credit" class="btn primary" type="submit" data-i18n="creditSubmit">Borca yaz</button>
+        </div>
+      </form>
+    </dialog>
     <script>
       let tables = [];
       let products = [];
@@ -176,8 +190,8 @@
           refresh:'Yenilə', table:'Masa', search:'Məhsul axtar...', send:'Masaya göndər',
           close:'Hesabı bağla', credit:'Açıq qalanlara borc yaz', available:'Boş', occupied:'Dolu', empty:'Bu masa hələ boşdur.',
           sent:'Məhsullar masaya göndərildi.', confirm:'Bu masanın hesabı bağlansın?',
-          creditConfirm:'Masa hesabı borc kimi Açıq qalanlara köçürülsün və masa boşaldılsın?',
-          creditCustomerPrompt:'Borc kimin adına yazılsın?',
+          creditDialogTitle:'Borc kimi qeyd et', creditCustomerName:'Müştərinin adı',
+          creditCustomerPlaceholder:'Müştərinin adını yazın', creditSubmit:'Borca yaz', cancel:'Ləğv et',
           creditCustomerRequired:'Borc üçün ad yazın. Masa sifarişi dəyişməyib.',
           creditSaved:'Masa borc kimi Açıq qalanlara köçürüldü.',
           creditPending:'Əvvəl seçilmiş məhsulları masaya göndərin.',
@@ -201,8 +215,8 @@
           refresh:'Refresh', table:'Table', search:'Search product...', send:'Send to table',
           close:'Close bill', credit:'Save as open debt', available:'Available', occupied:'Occupied', empty:'This table is empty.',
           sent:'Products sent to table.', confirm:'Close this table bill?',
-          creditConfirm:'Move this bill to Open Orders as debt and free the table?',
-          creditCustomerPrompt:'Whose name should this debt be under?',
+          creditDialogTitle:'Save as debt', creditCustomerName:'Customer name',
+          creditCustomerPlaceholder:'Enter the customer name', creditSubmit:'Save as debt', cancel:'Cancel',
           creditCustomerRequired:'Enter a name for the debt. The table order was not changed.',
           creditSaved:'Table bill moved to Open Orders as debt.',
           creditPending:'Send the selected products to the table first.',
@@ -228,8 +242,8 @@
           credit:'Записать в открытые долги',
           available:'Свободен', occupied:'Занят', empty:'Этот стол пуст.',
           sent:'Товары отправлены на стол.', confirm:'Закрыть счёт этого стола?',
-          creditConfirm:'Перенести счёт в открытые долги и освободить стол?',
-          creditCustomerPrompt:'На чьё имя записать долг?',
+          creditDialogTitle:'Записать как долг', creditCustomerName:'Имя клиента',
+          creditCustomerPlaceholder:'Введите имя клиента', creditSubmit:'Записать долг', cancel:'Отмена',
           creditCustomerRequired:'Укажите имя должника. Заказ стола не изменён.',
           creditSaved:'Счёт стола перенесён в открытые долги.',
           creditPending:'Сначала отправьте выбранные товары на стол.',
@@ -253,8 +267,8 @@
           refresh:'Yenile', table:'Masa', search:'Ürün ara...', send:'Masaya gönder',
           close:'Hesabı kapat', credit:'Açık borçlara kaydet', available:'Boş', occupied:'Dolu', empty:'Bu masa boş.',
           sent:'Ürünler masaya gönderildi.', confirm:'Bu masanın hesabı kapatılsın mı?',
-          creditConfirm:'Hesap açık borçlara aktarılsın ve masa boşaltılsın mı?',
-          creditCustomerPrompt:'Borç kimin adına yazılsın?',
+          creditDialogTitle:'Borç olarak kaydet', creditCustomerName:'Müşteri adı',
+          creditCustomerPlaceholder:'Müşteri adını yazın', creditSubmit:'Borç olarak kaydet', cancel:'İptal',
           creditCustomerRequired:'Borç için bir ad girin. Masa siparişi değişmedi.',
           creditSaved:'Masa hesabı açık borçlara aktarıldı.',
           creditPending:'Önce seçilen ürünleri masaya gönderin.',
@@ -442,32 +456,59 @@
       });
       const tableCreditButton = document.getElementById('table-credit');
       if (tableCreditButton) {
-        tableCreditButton.addEventListener('click', async () => {
+        const tableCreditDialog = document.getElementById('table-credit-dialog');
+        const tableCreditForm = document.getElementById('table-credit-form');
+        const tableCreditCustomer = document.getElementById('table-credit-customer');
+        const tableCreditMessage = document.getElementById('table-credit-message');
+        tableCreditButton.addEventListener('click', () => {
           if (!selectedTable || !selectedTable.occupied) return;
           if (pendingCart.length) {
             document.getElementById('table-message').textContent = t('creditPending');
             return;
           }
-          if (!confirm(t('creditConfirm'))) return;
-          const customerName = prompt(t('creditCustomerPrompt'));
-          if (customerName === null) return;
-          if (!customerName.trim()) {
-            document.getElementById('table-message').textContent = t('creditCustomerRequired');
+          tableCreditMessage.textContent = '';
+          tableCreditCustomer.value = '';
+          tableCreditDialog.showModal();
+          tableCreditCustomer.focus();
+        });
+        document.getElementById('cancel-table-credit').addEventListener('click', () => {
+          tableCreditDialog.close();
+        });
+        tableCreditForm.addEventListener('submit', async event => {
+          event.preventDefault();
+          if (!selectedTable || !selectedTable.occupied) {
+            tableCreditMessage.textContent = t('tableActionFailed');
             return;
           }
-          const response = await fetch(`/api/tables/${selectedTable.number}/credit`, {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({customer_name: customerName.trim()})
-          });
-          const result = await response.json();
-          if (!response.ok) {
-            document.getElementById('table-message').textContent = result.message || t('tableActionFailed');
+          const customerName = tableCreditCustomer.value.trim();
+          if (!customerName) {
+            tableCreditMessage.textContent = t('creditCustomerRequired');
             return;
           }
-          await loadTables();
-          closeTableModal();
-          alert(t('creditSaved'));
+          const submitButton = document.getElementById('submit-table-credit');
+          submitButton.disabled = true;
+          tableCreditMessage.textContent = '';
+          try {
+            const response = await fetch(`/api/tables/${selectedTable.number}/credit`, {
+              method: 'POST',
+              headers: {'Content-Type': 'application/json'},
+              body: JSON.stringify({customer_name: customerName})
+            });
+            const result = await response.json();
+            if (!response.ok) throw new Error(result.message || t('tableActionFailed'));
+            tableCreditDialog.close();
+            document.getElementById('table-message').textContent = result.message || t('creditSaved');
+            try {
+              await loadTables();
+              document.getElementById('table-message').textContent = t('creditSaved');
+            } catch (error) {
+              document.getElementById('table-message').textContent = `${t('creditSaved')} ${error.message}`;
+            }
+          } catch (error) {
+            tableCreditMessage.textContent = error.message || t('tableActionFailed');
+          } finally {
+            submitButton.disabled = false;
+          }
         });
       }
       document.getElementById('tables-lang-select').addEventListener('change', event => applyLanguage(event.target.value));
