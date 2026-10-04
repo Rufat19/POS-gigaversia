@@ -82,6 +82,20 @@
         <div id="paid-orders-list" class="credit-orders-grid"></div>
       </section>
     </main>
+    <dialog id="payment-dialog" class="product-edit-dialog">
+      <form id="payment-form" class="product-edit-form">
+        <h2 id="payment-dialog-title"></h2>
+        <label class="form-group">
+          <span data-i18n="paymentAmountLabel">Ödəniş məbləği (AZN)</span>
+          <input id="payment-amount" type="text" inputmode="decimal" autocomplete="off" required>
+        </label>
+        <div id="payment-dialog-message" class="form-message" aria-live="polite"></div>
+        <div class="form-actions">
+          <button id="cancel-payment" class="btn secondary" type="button" data-i18n="cancel">Ləğv et</button>
+          <button id="submit-payment" class="btn primary" type="submit"></button>
+        </div>
+      </form>
+    </dialog>
     <script>
       const currentRole = '{{ "admin" if session.get("role") == "admin" else ("manager" if session.get("role") == "manager" else "seller") }}';
       const translations = {
@@ -95,7 +109,9 @@
           paidFilter: 'Ödənilmiş', newest: 'Yeni', oldest: 'Köhnə', amount: 'Məbləğ',
           name: 'Ad', groupByCustomer: 'Müştəriyə görə qruplaşdır',
           noOpen: 'Açıq sifariş yoxdur.', noHistory: 'Borc tarixçəsi boşdur.',
-          paymentPrompt: 'Ödənilən məbləği yazın (AZN):', fullPaymentConfirm: 'Borcun qalan {amount} AZN məbləği tam ödənilsin?',
+          paymentPrompt: 'Hissəli ödəniş', fullPaymentConfirm: 'Tam ödəniş',
+          paymentAmountLabel: 'Ödəniş məbləği (AZN)', submitPayment: 'Ödənişi təsdiqlə',
+          confirmFullPayment: 'Tam ödənişi təsdiqlə', cancel: 'Ləğv et',
           invalidPayment: 'Düzgün ödəniş məbləği yazın.',
           paymentFailed: 'Ödəniş qeydə alınmadı.', loadFailed: 'Sifarişlər yüklənmədi.',
           clearDebtHistory: 'Borc tarixçəsini təmizlə',
@@ -112,7 +128,9 @@
           paidFilter: 'Paid', newest: 'Newest', oldest: 'Oldest', amount: 'Amount',
           name: 'Name', groupByCustomer: 'Group by customer',
           noOpen: 'No open orders.', noHistory: 'Credit history is empty.',
-          paymentPrompt: 'Enter payment amount (AZN):', fullPaymentConfirm: 'Pay the remaining balance of {amount} AZN in full?',
+          paymentPrompt: 'Partial payment', fullPaymentConfirm: 'Full payment',
+          paymentAmountLabel: 'Payment amount (AZN)', submitPayment: 'Confirm payment',
+          confirmFullPayment: 'Confirm full payment', cancel: 'Cancel',
           invalidPayment: 'Enter a valid payment amount.',
           paymentFailed: 'Payment was not recorded.', loadFailed: 'Orders could not be loaded.',
           clearDebtHistory: 'Clear debt history',
@@ -129,7 +147,9 @@
           paidFilter: 'Оплаченные', newest: 'Новые', oldest: 'Старые', amount: 'Сумма',
           name: 'Имя', groupByCustomer: 'Группировать по клиенту',
           noOpen: 'Нет открытых заказов.', noHistory: 'История долгов пуста.',
-          paymentPrompt: 'Введите сумму оплаты (AZN):', fullPaymentConfirm: 'Полностью оплатить оставшуюся сумму {amount} AZN?',
+          paymentPrompt: 'Частичная оплата', fullPaymentConfirm: 'Полная оплата',
+          paymentAmountLabel: 'Сумма оплаты (AZN)', submitPayment: 'Подтвердить оплату',
+          confirmFullPayment: 'Подтвердить полную оплату', cancel: 'Отмена',
           invalidPayment: 'Введите корректную сумму.',
           paymentFailed: 'Платеж не записан.', loadFailed: 'Не удалось загрузить заказы.',
           clearDebtHistory: 'Очистить историю долгов',
@@ -146,7 +166,9 @@
           paidFilter: 'Ödenmiş', newest: 'Yeni', oldest: 'Eski', amount: 'Tutar',
           name: 'Ad', groupByCustomer: 'Müşteriye göre grupla',
           noOpen: 'Açık sipariş yok.', noHistory: 'Borç geçmişi boş.',
-          paymentPrompt: 'Ödeme tutarını yazın (AZN):', fullPaymentConfirm: 'Kalan {amount} AZN borç tamamen ödensin mi?',
+          paymentPrompt: 'Kısmi ödeme', fullPaymentConfirm: 'Tam ödeme',
+          paymentAmountLabel: 'Ödeme tutarı (AZN)', submitPayment: 'Ödemeyi onayla',
+          confirmFullPayment: 'Tam ödemeyi onayla', cancel: 'İptal',
           invalidPayment: 'Geçerli bir ödeme tutarı yazın.',
           paymentFailed: 'Ödeme kaydedilmedi.', loadFailed: 'Siparişler yüklenemedi.',
           clearDebtHistory: 'Borç geçmişini temizle',
@@ -179,6 +201,8 @@
         const clearDebtHistoryButton = document.getElementById('clear-debt-history-btn');
         if (clearDebtHistoryButton) clearDebtHistoryButton.textContent = dict.clearDebtHistory;
         document.getElementById('orders-search').placeholder = dict.searchCustomer;
+        document.querySelector('[data-i18n="paymentAmountLabel"]').textContent = dict.paymentAmountLabel;
+        document.querySelector('[data-i18n="cancel"]').textContent = dict.cancel;
         document.querySelector('[data-status="all"]').textContent = dict.all;
         document.querySelector('[data-status="open"]').textContent = dict.open;
         document.querySelector('[data-status="paid"]').textContent = dict.paidFilter;
@@ -194,6 +218,28 @@
       let allOrders = [];
       let selectedStatus = 'all';
       let selectedSort = 'newest';
+      let activePaymentOrderId = null;
+      let fullPaymentAmount = null;
+      const paymentDialog = document.getElementById('payment-dialog');
+      const paymentForm = document.getElementById('payment-form');
+      const paymentAmountInput = document.getElementById('payment-amount');
+      const paymentDialogMessage = document.getElementById('payment-dialog-message');
+      function openPaymentDialog(orderId, amount=null){
+        activePaymentOrderId = orderId;
+        fullPaymentAmount = amount;
+        paymentDialogMessage.textContent = '';
+        document.getElementById('payment-dialog-title').textContent = amount === null
+          ? t('paymentPrompt')
+          : `${t('fullPaymentConfirm')} · ${amount.toFixed(2)} AZN`;
+        paymentAmountInput.value = amount === null ? '' : amount.toFixed(2);
+        paymentAmountInput.readOnly = amount !== null;
+        document.getElementById('submit-payment').textContent = amount === null
+          ? t('submitPayment')
+          : t('confirmFullPayment');
+        paymentDialog.showModal();
+        if (amount === null) paymentAmountInput.focus();
+      }
+      document.getElementById('cancel-payment').addEventListener('click', () => paymentDialog.close());
       function formatBakuDateTime(value){
         const raw = String(value || '');
         const iso = raw.includes('T') ? raw : raw.replace(' ', 'T');
@@ -253,26 +299,37 @@
         allOrders = result.orders;
         renderOrderLists();
       }
-      async function payOrder(orderId, fullAmount=null){
-        let parsed=fullAmount;
-        if(parsed!==null){
-          const confirmMessage=t('fullPaymentConfirm').replace('{amount}', parsed.toFixed(2));
-          if(!window.confirm(confirmMessage)) return;
-        }else{
-          const amount=window.prompt(t('paymentPrompt'));
-          if(amount===null) return;
-          parsed=Number(amount.replace(',', '.'));
-        }
-        if(!Number.isFinite(parsed) || parsed<=0){ alert(t('invalidPayment')); return; }
-        const response=await fetch(`/api/credit-orders/${orderId}/pay`,{
-          method:'POST',
-          headers:{'Content-Type':'application/json'},
-          body:JSON.stringify({amount:parsed})
-        });
-        const result=await response.json();
-        if(!response.ok){ alert(result.message || t('paymentFailed')); return; }
-        loadOrders().catch(error=>alert(error.message));
+      function payOrder(orderId, fullAmount=null){
+        openPaymentDialog(orderId, fullAmount);
       }
+      paymentForm.addEventListener('submit', async event => {
+        event.preventDefault();
+        const parsed = fullPaymentAmount === null
+          ? Number(paymentAmountInput.value.trim().replace(',', '.'))
+          : fullPaymentAmount;
+        if(!Number.isFinite(parsed) || parsed<=0){
+          paymentDialogMessage.textContent = t('invalidPayment');
+          return;
+        }
+        const submitButton = document.getElementById('submit-payment');
+        submitButton.disabled = true;
+        paymentDialogMessage.textContent = '';
+        try {
+          const response=await fetch(`/api/credit-orders/${activePaymentOrderId}/pay`,{
+            method:'POST',
+            headers:{'Content-Type':'application/json'},
+            body:JSON.stringify({amount:parsed})
+          });
+          const result=await response.json();
+          if(!response.ok) throw new Error(result.message || t('paymentFailed'));
+          paymentDialog.close();
+          await loadOrders();
+        } catch(error) {
+          paymentDialogMessage.textContent = error.message || t('paymentFailed');
+        } finally {
+          submitButton.disabled = false;
+        }
+      });
       document.getElementById('open-orders-lang-select').addEventListener('change', (event) => {
         applyLanguage(event.target.value);
         loadOrders().catch(error=>alert(error.message));
