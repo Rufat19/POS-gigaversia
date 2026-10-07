@@ -26,16 +26,15 @@ The compact RoBo Radio control appears on the signed-in POS pages. It lists jazz
 
 Radio station streams have their own usage terms. Confirm that a station and any required local public-performance license allow playback in a restaurant before using it for business.
 
-## Set a custom Windows icon
+## Windows app icon
 
-From this folder, create the assets directory, then copy your Windows `.ico` file there:
+The installer and app window use the RoBo robot icon in `assets\robo.ico`. Its editable vector artwork is in `assets\robo.svg`. To use a different Windows icon, replace `assets\robo.ico` with a multi-resolution `.ico` file, then rebuild the installer:
 
 ```powershell
-New-Item -ItemType Directory -Force assets
-Copy-Item "C:\path\to\your\icon.ico" "assets\robo.ico"
+npm run dist:win
 ```
 
-The build automatically uses this file for the application window and installer. If it is absent, the installer still builds with the default icon.
+The build uses the `.ico` file for the application window, installer, and shortcuts.
 
 ## Build the installer
 
