@@ -176,6 +176,7 @@
         </div>
       </form>
     </dialog>
+    <script src="{{ url_for('static', filename='js/receipt.js') }}"></script>
     <script>
       let tables = [];
       let products = [];
@@ -499,12 +500,47 @@
       document.getElementById('close-table-bill').addEventListener('click', async () => {
         if (!selectedTable || !selectedTable.occupied) return;
         if (!confirm(t('confirm'))) return;
-        const response = await fetch(`/api/tables/${selectedTable.number}/close`, {method: 'POST'});
-        const result = await response.json();
-        document.getElementById('table-message').textContent = result.message;
-        if (!response.ok) return;
-        await loadTables();
-        closeTableModal();
+        const tableNumber = selectedTable.number;
+        const receiptWindow = window.open('', '_blank', 'width=420,height=760');
+        const tableMessage = document.getElementById('table-message');
+        const closeButton = document.getElementById('close-table-bill');
+        let receiptWarning = '';
+        closeButton.disabled = true;
+        try {
+          const response = await fetch(`/api/tables/${tableNumber}/close`, {method: 'POST'});
+          const result = await response.json();
+          if (!response.ok) throw new Error(result.message || t('tableActionFailed'));
+          tableMessage.textContent = result.message;
+          if (receiptWindow) {
+            try {
+              if (!Array.isArray(result.items)) throw new Error('Qəbz məlumatları serverdən alınmadı.');
+              const receiptItems = result.items.map(item => ({
+                name: item.name,
+                quantity: item.quantity,
+                price: item.unit_price
+              }));
+              window.printReceipt(result, receiptItems, receiptWindow);
+            } catch (error) {
+              console.error('Print error', error);
+              receiptWarning = 'Hesab bağlandı, lakin qəbz açıla bilmədi.';
+              receiptWindow.close();
+            }
+          } else {
+            receiptWarning = 'Hesab bağlandı, lakin brauzer qəbz pəncərəsini blokladı. Popup icazəsini aktiv edin.';
+          }
+          try {
+            await loadTables();
+          } catch (error) {
+            tableMessage.textContent = `Hesab bağlandı. ${error.message || t('tablesUnavailable')}`;
+          }
+          closeTableModal();
+          if (receiptWarning) alert(receiptWarning);
+        } catch (error) {
+          if (receiptWindow && !receiptWindow.closed) receiptWindow.close();
+          tableMessage.textContent = error.message || t('tableActionFailed');
+        } finally {
+          closeButton.disabled = false;
+        }
       });
       const tableCreditButton = document.getElementById('table-credit');
       if (tableCreditButton) {

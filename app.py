@@ -2966,12 +2966,26 @@ def close_table(table_number):
                     "INSERT INTO sale_items (sale_id, product_id, quantity, unit_price) VALUES (?, ?, ?, ?)",
                     (sale_id, _row_value(item, "product_id"), _row_value(item, "quantity"), _row_value(item, "unit_price")),
                 )
+        receipt_items = [
+            {
+                "name": _row_value(item, "name"),
+                "quantity": _row_value(item, "quantity"),
+                "unit_price": float(_row_value(item, "unit_price")),
+            }
+            for item in items
+        ]
         cur.execute(
             f"UPDATE table_orders SET status = 'closed', closed_at = CURRENT_TIMESTAMP WHERE id = {placeholder}",
             (order_id,),
         )
         conn.commit()
-        return jsonify({"success": True, "sale_id": sale_id, "total": round(total, 2), "message": "Masa hesabı bağlandı."})
+        return jsonify({
+            "success": True,
+            "sale_id": sale_id,
+            "total": round(total, 2),
+            "items": receipt_items,
+            "message": "Masa hesabı bağlandı.",
+        })
     except (sqlite3.Error, psycopg2.Error) as exc:
         conn.rollback()
         return jsonify({"success": False, "message": f"Hesab bağlanarkən xəta: {exc}"}), 500
