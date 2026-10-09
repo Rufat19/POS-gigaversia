@@ -59,9 +59,9 @@ is_production = bool(
     or os.getenv("FLASK_ENV") == "production"
 )
 
-if is_production and not all((secret_key, seller_pin, manager_pin)):
+if is_production and not all((secret_key, seller_pin, manager_pin, os.getenv("ADMIN_PIN"))):
     raise RuntimeError(
-        "SECRET_KEY, SELLER_PIN and MANAGER_PIN must be configured in production."
+        "SECRET_KEY, SELLER_PIN, MANAGER_PIN and ADMIN_PIN must be configured in production."
     )
 
 app.config["SECRET_KEY"] = secret_key or "local-development-only-secret"
