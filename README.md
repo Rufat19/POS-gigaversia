@@ -89,8 +89,8 @@ Railway-də eyni layihə/verilənlər bazasından istifadə edən ayrıca Cron s
 
 Cron service işləyən web service-dən ayrı olmalıdır; beləliklə Gunicorn worker-lərinin hər birində ayrıca planlayıcı açılıb eyni hesabatı təkrar göndərməyəcək. Test məktubunu admin panelindən yoxladıqdan və Railway Cron service-i aktiv etdikdən sonra gündəlik göndəriş başlayır.
 
-`ADMIN_PIN` verilməsə, lokal inkişaf üçün `414541` istifadə olunur. Production-da
-öz admin PIN-inizi Railway Variables bölməsində təyin edin.
+`ADMIN_PIN` dəyişənini hər mühitdə unikal admin PIN-i ilə konfiqurasiya edin.
+PIN dəyərini README-yə, repozitoriyə və ya açıq kanallara yazmayın.
 
 ### 6. Audit və təhlükəsizlik
 
@@ -155,6 +155,10 @@ yolu ilə təyin edin (məsələn, `/data/RoBo POS Setup 1.0.0.exe`). Fayl serve
 tapılmadıqda endpoint yükləmə uğursuzluğunu açıq şəkildə bildirir.
 
 `DATABASE_URL`, `SECRET_KEY` və PIN-ləri GitHub-a, README-yə və ya source fayllarına yazma. Bu dəyişənlər yalnız Railway Variables bölməsində saxlanmalıdır.
+
+## Android planşet tətbiqi
+
+`android` qovluğundakı layihəni Android Studio ilə açıb APK yaratmaq, ilkin server ünvanını cihazda saxlamaq və quraşdırmaq qaydaları [android/README.md](android/README.md)-də göstərilib. Admin səhifəsindəki Android APK endirmə düyməsi üçün APK-nı Railway persistent volume-a yerləşdirin və `ANDROID_APK_PATH` dəyişənini faylın tam yolu ilə təyin edin.
 
 `Procfile` Railway üçün Gunicorn başlanğıc əmrini təqdim edir:
 

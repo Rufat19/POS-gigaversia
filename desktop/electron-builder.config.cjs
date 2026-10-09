@@ -17,7 +17,7 @@ module.exports = {
     output: 'release',
     buildResources: 'assets'
   },
-  files: ['main.js', 'preload.js', 'package.json'],
+  files: ['main.js', 'preload.js', 'setup-preload.js', 'setup.html', 'package.json'],
   win,
   nsis: {
     oneClick: false,

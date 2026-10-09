@@ -1,0 +1,20 @@
+<resources>
+    <string name="app_name">RoBo POS</string>
+    <string name="server_title">RoBo POS serveri</string>
+    <string name="server_description">Davam etmək üçün POS serverinin ünvanını daxil edin. Ünvan bu cihazda saxlanacaq.</string>
+    <string name="server_url_label">Server ünvanı</string>
+    <string name="server_url_hint">https://example.com</string>
+    <string name="save_and_open">Yadda saxla və aç</string>
+    <string name="change_server_url">Server ünvanını dəyiş</string>
+    <string name="invalid_saved_url">Saxlanmış server ünvanı yanlışdır. Ünvanı yenidən daxil edin.</string>
+    <string name="enter_server_url">Server ünvanını daxil edin.</string>
+    <string name="invalid_server_url">Düzgün server ünvanı daxil edin (məsələn, https://example.com).</string>
+    <string name="no_app_for_link">Bu keçidi açmaq üçün tətbiq tapılmadı.</string>
+    <string name="connection_error_title">Serverə qoşulmaq mümkün olmadı</string>
+    <string name="connection_error_message">İnternet bağlantısını və server ünvanını yoxlayın.</string>
+    <string name="change_server">Server ünvanını dəyiş</string>
+    <string name="retry">Yenidən yoxla</string>
+    <string name="print_unavailable">Bu cihazda çap xidməti mövcud deyil.</string>
+    <string name="receipt_print_job">RoBo POS qəbzi</string>
+    <string name="ssl_error">Serverin təhlükəsiz SSL sertifikatını yoxlamaq mümkün olmadı.</string>
+</resources>

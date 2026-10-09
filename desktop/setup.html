@@ -1,0 +1,123 @@
+<!doctype html>
+<html lang="az">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>RoBo POS — Server ünvanı</title>
+    <style>
+      :root {
+        color-scheme: light;
+        font-family: "Segoe UI", sans-serif;
+        color: #1f2937;
+        background: #f3f6fb;
+      }
+
+      body {
+        display: grid;
+        min-height: 100vh;
+        margin: 0;
+        place-items: center;
+      }
+
+      main {
+        box-sizing: border-box;
+        width: min(100% - 40px, 420px);
+        padding: 30px;
+        border: 1px solid #e1e7f0;
+        border-radius: 12px;
+        background: #fff;
+        box-shadow: 0 12px 32px rgb(31 41 55 / 8%);
+      }
+
+      h1 {
+        margin: 0 0 8px;
+        font-size: 23px;
+      }
+
+      p {
+        margin: 0 0 22px;
+        color: #667085;
+        line-height: 1.5;
+      }
+
+      label {
+        display: block;
+        margin-bottom: 8px;
+        font-weight: 600;
+      }
+
+      input,
+      button {
+        box-sizing: border-box;
+        width: 100%;
+        min-height: 44px;
+        border-radius: 7px;
+        font: inherit;
+      }
+
+      input {
+        padding: 0 12px;
+        border: 1px solid #cbd5e1;
+      }
+
+      button {
+        margin-top: 14px;
+        border: 0;
+        background: #1769d2;
+        color: #fff;
+        font-weight: 600;
+        cursor: pointer;
+      }
+
+      button:disabled {
+        opacity: 0.65;
+        cursor: wait;
+      }
+
+      #error {
+        min-height: 20px;
+        margin: 10px 0 0;
+        color: #b42318;
+        font-size: 13px;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>RoBo POS serveri</h1>
+      <p>Davam etmək üçün POS serverinin ünvanını daxil edin. Ünvan bu kompüterdə saxlanacaq.</p>
+      <form id="server-form">
+        <label for="server-url">Server ünvanı</label>
+        <input
+          id="server-url"
+          name="server-url"
+          type="url"
+          placeholder="https://example.com"
+          autocomplete="url"
+          required
+          autofocus
+        >
+        <button id="submit" type="submit">Yadda saxla və aç</button>
+        <p id="error" role="alert" aria-live="polite"></p>
+      </form>
+    </main>
+    <script>
+      const form = document.getElementById('server-form');
+      const input = document.getElementById('server-url');
+      const submitButton = document.getElementById('submit');
+      const errorMessage = document.getElementById('error');
+
+      form.addEventListener('submit', async event => {
+        event.preventDefault();
+        errorMessage.textContent = '';
+        submitButton.disabled = true;
+        try {
+          await window.roboSetup.saveServerUrl(input.value);
+        } catch (error) {
+          errorMessage.textContent = error.message || 'Server ünvanını saxlamaq mümkün olmadı.';
+          submitButton.disabled = false;
+        }
+      });
+    </script>
+  </body>
+</html>

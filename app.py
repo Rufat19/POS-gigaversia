@@ -1710,6 +1710,42 @@ def download_desktop_installer():
     )
 
 
+@app.route('/admin/download/robo-pos.apk')
+def download_android_apk():
+    """Download the Android tablet app for administrators."""
+    if session.get("role") != "admin":
+        abort(403)
+
+    configured_path = os.getenv("ANDROID_APK_PATH")
+    apk_path = (
+        Path(configured_path)
+        if configured_path
+        else (
+            Path(__file__).resolve().parent
+            / "android"
+            / "app"
+            / "build"
+            / "outputs"
+            / "apk"
+            / "debug"
+            / "app-debug.apk"
+        )
+    )
+    if not apk_path.is_file():
+        return jsonify({
+            "success": False,
+            "message": "Android APK faylı serverdə tapılmadı. ANDROID_APK_PATH parametrini yoxlayın.",
+        }), 404
+
+    return send_file(
+        apk_path,
+        as_attachment=True,
+        download_name="robo-pos.apk",
+        mimetype="application/vnd.android.package-archive",
+        max_age=0,
+    )
+
+
 @app.route('/api/admin/permissions', methods=['POST'])
 def update_admin_permissions():
     """Update feature access switches; this endpoint is administrator-only."""

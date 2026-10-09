@@ -1,6 +1,6 @@
 # RoBo POS Desktop for Windows
 
-This Electron app opens the production Robo POS site in a desktop window. Sales receipts that call `window.print()` are sent silently to the Windows default printer.
+This Electron app opens the configured Robo POS server in a desktop window. On first launch, enter the server URL; the app saves it on this computer and uses it on later launches. Sales receipts that call `window.print()` are sent silently to the Windows default printer.
 
 ## Requirements
 
